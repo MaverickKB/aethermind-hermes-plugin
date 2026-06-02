@@ -25,6 +25,10 @@ git -c protocol.file.allow=always submodule add \
 **Alternatives:** `git subtree add` from the kit repo; or `rsync -a --delete` (loses shared
 history — use only as last resort).
 
+**Stranger clones:** `.gitmodules` currently points at a **relative local path** valid only on
+this dev layout. Before public OSS launch, repoint `url` to the **public** kit remote (or
+vendor a copy) so `git clone --recurse-submodules` works off GitHub.
+
 ## North star (optional research, not OSS requirement)
 
 Do not commit secrets. OSS must remain stranger-runnable (no homestead paths).
