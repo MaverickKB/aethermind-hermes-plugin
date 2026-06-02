@@ -1,0 +1,35 @@
+name: CI
+
+# Requires `nous-continuity-validation-kit` submodule URL to be a **public** cloneable remote
+# before this passes on GitHub-hosted runners (today `.gitmodules` is a relative local path).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validation-kit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nous-continuity-validation-kit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test deps
+        run: pip install pytest
+      - name: Pytest
+        run: python3 -m pytest -q
+      - name: validate_aem_store (fixture)
+        run: python3 tools/validate_aem_store.py --project-root fixtures/minimal-aem-project
+      - name: validate_benchmark_packet (redacted zip)
+        run: |
+          python3 tools/validate_benchmark_packet.py \
+            --zip evidence/first-benchmark-redacted/public-redacted-proof.zip \
+            --sha256-file evidence/first-benchmark-redacted/public-redacted-proof.zip.sha256
