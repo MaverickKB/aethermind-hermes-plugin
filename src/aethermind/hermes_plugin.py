@@ -107,186 +107,143 @@ def _integrity_manifest_handler(args: dict[str, Any], **_kwargs: Any) -> str:
     return _json(integrity_manifest(str(args["project_root"])))
 
 
+def _object_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
+    return {"type": "object", "properties": properties, "required": required}
+
+
+PROJECT_ROOT = {"project_root": {"type": "string"}}
+TEXT_ARRAY = {"type": "array", "items": {"type": "string"}}
+
+TOOL_SPECS = [
+    (
+        "aethermind_init_store",
+        "Initialize an AetherMind .aem store in a project root.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _init_store_handler,
+    ),
+    (
+        "aethermind_write_layer",
+        "Append an AetherMind continuity layer.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "fork",
+                        "friction",
+                        "discovery",
+                        "uncertainty",
+                        "correction",
+                        "load-bearing",
+                    ],
+                },
+                "body": {"type": "string"},
+                "ctx": {"type": "string"},
+                "author": {"type": "string"},
+                "conf": {"type": "number", "default": 1.0},
+                "markers": TEXT_ARRAY,
+                "evidence": TEXT_ARRAY,
+                "verification": TEXT_ARRAY,
+            },
+            ["project_root", "type", "body", "ctx"],
+        ),
+        _write_layer_handler,
+    ),
+    (
+        "aethermind_read_layers",
+        "Read/search AetherMind continuity layers.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "ctx_prefix": {"type": "string"},
+                "type": {"type": "string"},
+                "marker": {"type": "string"},
+                "author": {"type": "string"},
+                "text": {"type": "string"},
+                "limit": {"type": "integer", "default": 20},
+            },
+            ["project_root"],
+        ),
+        _read_layers_handler,
+    ),
+    (
+        "aethermind_write_texture",
+        "Append a short AetherMind texture entry.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "body": {"type": "string"},
+                "ctx": {"type": "string"},
+                "marker": {"type": "string"},
+            },
+            ["project_root", "body"],
+        ),
+        _write_texture_handler,
+    ),
+    (
+        "aethermind_read_texture",
+        "Read the AetherMind texture file.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _read_texture_handler,
+    ),
+    (
+        "aethermind_reorient",
+        "Build a task-relevant reorientation bundle from AetherMind layers.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "task": {"type": "string"},
+                "limit": {"type": "integer", "default": 8},
+            },
+            ["project_root", "task"],
+        ),
+        _reorient_handler,
+    ),
+    (
+        "aethermind_evaluate_store",
+        "Evaluate an AetherMind store for schema, privacy, density warnings, and continuity properties.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _evaluate_store_handler,
+    ),
+    (
+        "aethermind_export_store",
+        "Export an AetherMind store as JSON.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _export_store_handler,
+    ),
+    (
+        "aethermind_import_layers",
+        "Import a sanitized AetherMind layers.aem payload into a project store.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "layers_aem": {"type": "string"},
+                "texture_aem": {"type": "string"},
+                "allow_existing": {"type": "boolean", "default": False},
+            },
+            ["project_root", "layers_aem"],
+        ),
+        _import_layers_handler,
+    ),
+    (
+        "aethermind_integrity_manifest",
+        "Return SHA-256 hashes and layer IDs for an AetherMind store.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _integrity_manifest_handler,
+    ),
+]
+
+
 def register(ctx: Any) -> None:
-    ctx.register_tool(
-        name="aethermind_init_store",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_init_store",
-            "description": "Initialize an AetherMind .aem store in a project root.",
-            "parameters": {
-                "type": "object",
-                "properties": {"project_root": {"type": "string"}},
-                "required": ["project_root"],
+    for name, description, parameters, handler in TOOL_SPECS:
+        ctx.register_tool(
+            name=name,
+            toolset=TOOLSET,
+            schema={
+                "name": name,
+                "description": description,
+                "parameters": parameters,
             },
-        },
-        handler=_init_store_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_write_layer",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_write_layer",
-            "description": "Append an AetherMind continuity layer.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "project_root": {"type": "string"},
-                    "type": {
-                        "type": "string",
-                        "enum": [
-                            "fork",
-                            "friction",
-                            "discovery",
-                            "uncertainty",
-                            "correction",
-                            "load-bearing",
-                        ],
-                    },
-                    "body": {"type": "string"},
-                    "ctx": {"type": "string"},
-                    "author": {"type": "string"},
-                    "conf": {"type": "number", "default": 1.0},
-                    "markers": {"type": "array", "items": {"type": "string"}},
-                    "evidence": {"type": "array", "items": {"type": "string"}},
-                    "verification": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["project_root", "type", "body", "ctx"],
-            },
-        },
-        handler=_write_layer_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_read_layers",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_read_layers",
-            "description": "Read/search AetherMind continuity layers.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "project_root": {"type": "string"},
-                    "ctx_prefix": {"type": "string"},
-                    "type": {"type": "string"},
-                    "marker": {"type": "string"},
-                    "author": {"type": "string"},
-                    "text": {"type": "string"},
-                    "limit": {"type": "integer", "default": 20},
-                },
-                "required": ["project_root"],
-            },
-        },
-        handler=_read_layers_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_write_texture",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_write_texture",
-            "description": "Append a short AetherMind texture entry.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "project_root": {"type": "string"},
-                    "body": {"type": "string"},
-                    "ctx": {"type": "string"},
-                    "marker": {"type": "string"},
-                },
-                "required": ["project_root", "body"],
-            },
-        },
-        handler=_write_texture_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_read_texture",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_read_texture",
-            "description": "Read the AetherMind texture file.",
-            "parameters": {
-                "type": "object",
-                "properties": {"project_root": {"type": "string"}},
-                "required": ["project_root"],
-            },
-        },
-        handler=_read_texture_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_reorient",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_reorient",
-            "description": "Build a task-relevant reorientation bundle from AetherMind layers.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "project_root": {"type": "string"},
-                    "task": {"type": "string"},
-                    "limit": {"type": "integer", "default": 8},
-                },
-                "required": ["project_root", "task"],
-            },
-        },
-        handler=_reorient_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_evaluate_store",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_evaluate_store",
-            "description": "Evaluate an AetherMind store for schema, privacy, density warnings, and continuity properties.",
-            "parameters": {
-                "type": "object",
-                "properties": {"project_root": {"type": "string"}},
-                "required": ["project_root"],
-            },
-        },
-        handler=_evaluate_store_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_export_store",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_export_store",
-            "description": "Export an AetherMind store as JSON.",
-            "parameters": {
-                "type": "object",
-                "properties": {"project_root": {"type": "string"}},
-                "required": ["project_root"],
-            },
-        },
-        handler=_export_store_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_import_layers",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_import_layers",
-            "description": "Import a sanitized AetherMind layers.aem payload into a project store.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "project_root": {"type": "string"},
-                    "layers_aem": {"type": "string"},
-                    "texture_aem": {"type": "string"},
-                    "allow_existing": {"type": "boolean", "default": False},
-                },
-                "required": ["project_root", "layers_aem"],
-            },
-        },
-        handler=_import_layers_handler,
-    )
-    ctx.register_tool(
-        name="aethermind_integrity_manifest",
-        toolset=TOOLSET,
-        schema={
-            "name": "aethermind_integrity_manifest",
-            "description": "Return SHA-256 hashes and layer IDs for an AetherMind store.",
-            "parameters": {
-                "type": "object",
-                "properties": {"project_root": {"type": "string"}},
-                "required": ["project_root"],
-            },
-        },
-        handler=_integrity_manifest_handler,
-    )
+            handler=handler,
+        )
