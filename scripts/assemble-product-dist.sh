@@ -40,8 +40,16 @@ for path in README.md README.public.md LICENSE pyproject.toml SECURITY.md CONTRI
 done
 
 rm -rf "$DROP/.git" "$DROP/.hermes" "$DROP/.aethermind"
-find "$DROP" \( -name __pycache__ -o -name .pytest_cache \) -prune -exec rm -rf {} + 2>/dev/null || true
-find "$DROP" -name '*.pyc' -delete
+find "$DROP" \( \
+  -name __pycache__ -o \
+  -name .pytest_cache -o \
+  -name .mypy_cache -o \
+  -name .ruff_cache -o \
+  -name '*.egg-info' -o \
+  -name build -o \
+  -name dist \
+\) -prune -exec rm -rf {} + 2>/dev/null || true
+find "$DROP" \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
 (
   cd "$DROP"
