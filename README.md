@@ -1,97 +1,78 @@
-# AetherMind
+# AetherMind Hermes Plugin
 
-AetherMind is a project-local continuity primitive for AI agents. It stores dense,
-append-only `.aem` layers near the project so future agents can recover the
-load-bearing parts of prior work: decisions, corrections, uncertainty, pressure,
-rationale, and local salience.
+AetherMind adds project-local continuity tools to Hermes. It stores compact,
+append-only `.aem` records beside a project so future agent sessions can recover
+the decisions, corrections, uncertainty, and pressure that matter without
+preserving full transcripts.
 
-AetherMind is not a generic memory database, transcript archive, task ledger, or
-chat log. The current baseline uses TOML-style records because they are
-portable and easy to inspect, but human readability is not the invariant. The
-invariant is compact machine-readable continuity that is cheap for agents to scan
-and reorient from.
+This repository is the Hermes plugin distribution. It is intentionally small:
+
+- `plugin.yaml` and `__init__.py` are the Hermes plugin entry point.
+- `aem_store.py` contains the local `.aem` store behavior.
+- `skills/aethermind-continuity/` provides the companion Hermes skill.
+- `docs/` and `examples/` describe the public store contract.
 
 ## Install
-
-From a checkout:
-
-```bash
-python3 -m pip install -e .
-```
-
-For Hermes, install AetherMind into Hermes' virtualenv and enable the packaged
-entry-point plugin:
-
-```bash
-HERMES_AGENT_ROOT="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}"
-uv pip install --python "$HERMES_AGENT_ROOT/venv/bin/python" .
-hermes plugins enable aethermind
-```
-
-Or install the Hermes plugin directly from GitHub:
 
 ```bash
 hermes plugins install MaverickKB/aethermind-hermes-plugin --enable
 hermes plugins list
 ```
 
-## Quick start
+Restart Hermes after enabling the plugin. In a running Hermes session,
+`/plugins` should show `aethermind`.
+
+## Tools
+
+The plugin registers:
+
+- `aethermind_init_store`
+- `aethermind_write_layer`
+- `aethermind_read_layers`
+- `aethermind_write_texture`
+- `aethermind_read_texture`
+- `aethermind_reorient`
+- `aethermind_evaluate_store`
+- `aethermind_export_store`
+- `aethermind_import_layers`
+- `aethermind_integrity_manifest`
+
+## What AetherMind Is
+
+AetherMind is a continuity substrate, not a general memory database. Use it for
+small, durable signals that help the next agent understand the project state:
+
+- decisions and constraints that should not be rediscovered;
+- corrections to wrong assumptions;
+- unresolved uncertainty that changes the next step;
+- friction or pressure that shaped the work;
+- evidence and verification pointers.
+
+## What It Is Not
+
+AetherMind is not a transcript archive, task log, chat history, analytics store,
+or deployment platform. Keep layers compact and avoid writing secrets, private
+operator paths, customer data, raw prompts, or high-volume logs.
+
+## Validation
+
+From the repository root:
 
 ```bash
-aethermind init --project-root /path/to/project
-
-aethermind write-layer \
-  --project-root /path/to/project \
-  --type load-bearing \
-  --body "mission: keep continuity compact" \
-  --ctx "planning/mission" \
-  --marker mission
-
-aethermind write-layer \
-  --project-root /path/to/project \
-  --type friction \
-  --body "pressure: do not turn layers into task logs" \
-  --ctx "planning/pressure" \
-  --marker pressure
-
-aethermind reorient --project-root /path/to/project --task "resume planning"
-aethermind validate-store --project-root /path/to/project
-aethermind export --project-root /path/to/project --out /tmp/aethermind-export.json
-aethermind import --project-root /tmp/imported-project --in /tmp/aethermind-export.json
+./scripts/ci-local.sh
 ```
 
-All CLI commands emit JSON.
-
-## Product boundary
-
-Included in this package:
-
-- `.aem` baseline continuity store contract
-- Python library and CLI
-- store validation, privacy checks, density warnings, and integrity manifests
-- export/import helpers
-- optional Hermes reference adapter
-- docs and examples
-
-Not included:
-
-- generic memory, broad recall, transcript storage, or task logging
-- deployment-specific orchestration
-- benchmark, evidence, or reviewer packets
+The validation script compiles the plugin, smoke-tests the Hermes registration
+surface, verifies the example store, and scans the public files for common
+publishing mistakes.
 
 ## Documentation
 
-- `docs/SCOPE.md` — product scope and non-memory boundary
-- `docs/AEM_FORMAT.md` — baseline `.aem` record format
-- `docs/CLI.md` — command examples
-- `docs/HERMES_PLUGIN.md` — optional Hermes adapter
-- `docs/PRIVACY.md` — what not to write into layers
+- `docs/SCOPE.md` defines the product boundary.
+- `docs/AEM_FORMAT.md` describes the baseline `.aem` record format.
+- `docs/HERMES_PLUGIN.md` covers Hermes installation and discovery notes.
+- `docs/PRIVACY.md` describes safe layer hygiene.
 
 ## License
 
 Apache-2.0. See `LICENSE`.
-
-You may use, copy, modify, and distribute this project, including in commercial
-software, as long as you keep the license and copyright notices. The license also
-includes an express patent grant from contributors. The project is provided as
-is, without warranty.

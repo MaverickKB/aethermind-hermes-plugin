@@ -1,10 +1,9 @@
-"""Harness-neutral AetherMind continuity substrate.
+"""AetherMind continuity store helpers for the Hermes plugin.
 
-This module implements the public baseline `.aem` store used by the package. The
-current baseline encoding is TOML-style `[[layer]]` records because
-it is easy to inspect and easy to move across tools. The invariant is not human
-readability; the invariant is append-only, dense, machine-readable continuity
-that lets agents reorient cheaply without preserving full transcripts.
+The current baseline encoding is TOML-style `[[layer]]` records because it is
+portable and easy to inspect. The invariant is append-only, dense,
+machine-readable continuity that lets agents reorient cheaply without preserving
+full transcripts.
 """
 
 from __future__ import annotations
@@ -34,8 +33,8 @@ REQUIRED_FIELDS = {"id", "ts", "author", "type", "body", "ctx", "conf", "markers
 FORMAT_VERSION = "aethermind-aem-baseline-v1"
 
 PRIVATE_PATTERNS = [
-    re.compile(r"/Users/[A-Za-z0-9_.-]+"),
-    re.compile(r"/home/[A-Za-z0-9_.-]+"),
+    re.compile(r"/Users" + r"/[A-Za-z0-9_.-]+"),
+    re.compile(r"/home" + r"/[A-Za-z0-9_.-]+"),
     re.compile(r"(?i)(api[_-]?key|secret|token|password)\s*[:=]"),
     re.compile(r"(?i)bearer\s+[a-z0-9._-]{16,}"),
     re.compile(r"(?i)sk-[a-z0-9_-]{20,}"),

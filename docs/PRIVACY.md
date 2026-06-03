@@ -1,21 +1,23 @@
 # Privacy
 
-AetherMind stores live beside project source. Treat them as local project data.
-Do not write secrets, credentials, private operator paths, customer data, raw
-prompts, private transcripts, or high-volume logs into `.aem` layers.
+AetherMind stores live beside project source. Treat them as project data and keep
+them small.
 
-The package includes privacy checks for common accidents:
+Do not write credentials, customer data, raw prompts, transcripts, private
+operator paths, or high-volume logs into `.aem` layers.
+
+The plugin checks for common accidents:
 
 - private-looking absolute paths
-- secret/token/password assignments
-- bearer tokens
-- `sk-...` style API keys
+- credential-style assignments
+- bearer-style tokens
+- `sk-...` style keys
 
-Literal examples should be marked clearly as examples, for example:
+Literal path examples should be marked clearly:
 
 ```text
 literal example: /Users/example/project
 ```
 
-Privacy checks are a guardrail, not a guarantee. Keep layers compact and avoid
-copying raw files, chat transcripts, or logs into continuity records.
+Privacy checks are guardrails, not guarantees. Keep layers compact and avoid
+copying raw files or logs into continuity records.

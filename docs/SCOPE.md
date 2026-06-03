@@ -1,33 +1,28 @@
 # Scope
 
-AetherMind is the continuity primitive: a compact, append-only project-local
-substrate that preserves working judgment for future agents.
+AetherMind is a compact, append-only continuity substrate for local projects. It
+preserves the small pieces of working judgment that a future agent session needs
+before touching the same project again.
 
-It is not generic memory. It is not transcript storage, broad recall, task
-logging, or a chat archive. `.aem` layers should be dense signals about what a
-future agent must not lose: decisions, corrections, uncertainty, friction,
-pressure, rationale, local salience, evidence pointers, supersession, rollback,
-and recurrence.
+## In Scope
 
-## In scope
+- Creating `.aethermind/layers.aem` and `.aethermind/texture.aem`.
+- Appending structured continuity layers.
+- Reading and searching project-local layers.
+- Writing and reading short texture entries.
+- Building a task-relevant reorientation bundle.
+- Evaluating store schema, density, privacy, and retrieval signals.
+- Exporting, importing, and hashing `.aem` stores.
+- Registering those behaviors as Hermes tools.
 
-- Baseline `.aem` store contract.
-- Append-only layer semantics.
-- Python library and CLI.
-- Store validation, privacy scanning, density warnings, export/import, and
-  integrity manifests.
-- Optional Hermes reference adapter over the same package core.
-- Public docs and examples that explain package behavior.
+## Out Of Scope
 
-## Out of scope
+- Transcript storage.
+- Generic long-term memory.
+- Task ledgers or status logs.
+- Customer-data storage.
+- Deployment orchestration.
+- Benchmark or review packets.
 
-- Benchmark, evidence, proof, or reviewer packets.
-- Generic memory product positioning.
-- Transcript archives and task ledgers.
-- Deployment-specific orchestration.
-
-## Product boundary
-
-AetherMind ships the substrate behavior. Integrators own their UI, agent
-routing, policy, and deployment identity. This package stands alone and should
-work without any external service.
+Integrators own their UI, routing, policy, and deployment identity. The plugin
+only provides local continuity tools.

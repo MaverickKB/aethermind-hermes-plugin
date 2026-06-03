@@ -6,5 +6,5 @@ pressure layer.
 Validate it with:
 
 ```bash
-aethermind validate-store --project-root examples/minimal-project
+./scripts/ci-local.sh
 ```
