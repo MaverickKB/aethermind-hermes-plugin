@@ -387,21 +387,40 @@ def export_store(project_root: str | Path) -> dict[str, Any]:
 def import_layers(project_root: str | Path, *, layers_aem: str, texture_aem: str = "", allow_existing: bool = False) -> dict[str, Any]:
     root, layers_path, texture_path = project_paths(project_root)
     init_store(project_root)
-    if layers_path.read_text(encoding="utf-8").strip() and not allow_existing:
+    existing_layers_text = layers_path.read_text(encoding="utf-8")
+    existing_texture_text = texture_path.read_text(encoding="utf-8") if texture_path.exists() else ""
+    if existing_layers_text.strip() and not allow_existing:
         raise ValueError("target layers.aem is not empty; pass allow_existing=true to append")
     raw_layers = _parse_layers_text(layers_aem)
     errors = validate_layers(raw_layers)
     if errors:
         raise ValueError("; ".join(errors))
+
+    if allow_existing and existing_layers_text.strip():
+        existing_layers = _parse_layers_text(existing_layers_text)
+        errors = validate_layers(existing_layers + raw_layers)
+        if errors:
+            raise ValueError("; ".join(errors))
+
     if allow_existing:
-        with layers_path.open("a", encoding="utf-8") as handle:
-            handle.write(layers_aem.rstrip() + "\n")
+        if existing_layers_text.strip():
+            next_layers_text = existing_layers_text.rstrip() + "\n" + layers_aem.rstrip() + "\n"
+        else:
+            next_layers_text = layers_aem.rstrip() + "\n"
     else:
-        layers_path.write_text(layers_aem.rstrip() + "\n", encoding="utf-8")
+        next_layers_text = layers_aem.rstrip() + "\n"
     if texture_aem:
         if allow_existing:
-            with texture_path.open("a", encoding="utf-8") as handle:
-                handle.write(texture_aem.rstrip() + "\n")
+            if existing_texture_text.strip():
+                next_texture_text = existing_texture_text.rstrip() + "\n" + texture_aem.rstrip() + "\n"
+            else:
+                next_texture_text = texture_aem.rstrip() + "\n"
         else:
-            texture_path.write_text(texture_aem.rstrip() + "\n", encoding="utf-8")
+            next_texture_text = texture_aem.rstrip() + "\n"
+    else:
+        next_texture_text = existing_texture_text
+
+    layers_path.write_text(next_layers_text, encoding="utf-8")
+    if texture_aem:
+        texture_path.write_text(next_texture_text, encoding="utf-8")
     return {"ok": True, "project_root": str(root), "imported_layer_count": len(raw_layers), "manifest": integrity_manifest(project_root)}

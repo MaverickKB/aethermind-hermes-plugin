@@ -97,3 +97,31 @@ def test_cli_smoke_outputs_json(tmp_path: Path) -> None:
 
     manifest = run_cli("manifest", "--project-root", str(imported_root), cwd=Path.cwd())
     assert manifest["format"] == "aethermind-aem-baseline-v1"
+
+
+def test_import_append_rejects_duplicate_without_mutating(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    core.write_layer(
+        source,
+        layer_type="load-bearing",
+        body="mission: preserve import integrity",
+        ctx="test/import",
+        author="pytest",
+        markers=["import"],
+    )
+    exported = core.export_store(source)
+
+    target = tmp_path / "target"
+    core.import_layers(target, layers_aem=exported["layers_aem"])
+    before = (target / ".aethermind" / "layers.aem").read_text(encoding="utf-8")
+
+    try:
+        core.import_layers(target, layers_aem=exported["layers_aem"], allow_existing=True)
+    except ValueError as exc:
+        assert "duplicate layer id" in str(exc)
+    else:
+        raise AssertionError("duplicate append should fail")
+
+    after = (target / ".aethermind" / "layers.aem").read_text(encoding="utf-8")
+    assert after == before
+    assert core.evaluate_store(target)["valid"] is True
