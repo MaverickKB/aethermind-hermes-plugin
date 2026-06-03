@@ -28,6 +28,13 @@ uv pip install --python "$HERMES_AGENT_ROOT/venv/bin/python" .
 hermes plugins enable aethermind
 ```
 
+Or install the Hermes plugin directly from GitHub:
+
+```bash
+hermes plugins install MaverickKB/aethermind-hermes-plugin --enable
+hermes plugins list
+```
+
 ## Quick start
 
 ```bash

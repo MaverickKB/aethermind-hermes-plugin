@@ -1,9 +1,21 @@
 # Hermes plugin
 
 The Hermes adapter is optional. It is a thin reference adapter over the
-`aethermind` package, not the architecture center.
+`aethermind` package.
 
 ## Recommended install
+
+Install from GitHub through Hermes:
+
+```bash
+hermes plugins install MaverickKB/aethermind-hermes-plugin --enable
+hermes plugins list
+```
+
+Restart Hermes after enabling. In a running session, `/plugins` should show
+`aethermind`.
+
+## Package install
 
 Install Hermes first:
 
@@ -23,7 +35,7 @@ uv pip install --python "$HERMES_AGENT_ROOT/venv/bin/python" .
 
 For a release artifact, replace `.` with the wheel or source distribution path.
 
-Enable the plugin:
+Enable the package entry-point plugin:
 
 ```bash
 hermes plugins enable aethermind
@@ -35,18 +47,16 @@ should show `aethermind` and the tools listed below.
 
 ## Source-tree adapter
 
-The source tree also includes a directory plugin for local Hermes checkout smoke
-tests:
+The repository root is the installable Hermes plugin. The source tree also
+keeps a copy of the adapter under:
 
 ```text
 plugins/hermes/aethermind/
 ```
 
-Do not use `hermes plugins install owner/repo --enable` against this repository
-layout unless the public repository root is the plugin directory. Hermes clones a
-Git repository into `~/.hermes/plugins/<name>/` and expects `plugin.yaml` and
-`__init__.py` at that installed plugin root. This repository keeps the adapter
-nested because the Python package is the product boundary.
+Hermes clones a Git repository into `~/.hermes/plugins/<name>/` and expects
+`plugin.yaml` and `__init__.py` at that installed plugin root. This repository
+therefore keeps root-level plugin files for GitHub/dashboard installs.
 
 For development-only manual testing, copy or symlink the adapter into the user
 plugin directory and install the package into Hermes' virtualenv:

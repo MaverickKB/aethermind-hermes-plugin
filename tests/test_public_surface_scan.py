@@ -46,3 +46,18 @@ def test_scanner_flags_macos_finder_metadata(tmp_path: Path) -> None:
     assert report["findings"]
     assert report["findings"][0]["pattern"] == "disallowed_filename"
     assert report["findings"][0]["match"] == ".DS_Store"
+
+
+def test_scanner_skips_local_metadata_dirs(tmp_path: Path) -> None:
+    local_store = tmp_path / ".aethermind"
+    local_store.mkdir()
+    local_store_text = "sec" + "ret = should be ignored\n"
+    (local_store / "layers.aem").write_text(local_store_text, encoding="utf-8")
+    egg_info = tmp_path / "aethermind.egg-info"
+    egg_info.mkdir()
+    (egg_info / "PKG-INFO").write_text("Author: local\n", encoding="utf-8")
+
+    report = scan_paths([tmp_path])
+
+    assert report["valid"] is True
+    assert report["findings"] == []

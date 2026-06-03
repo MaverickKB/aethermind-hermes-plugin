@@ -25,6 +25,7 @@ fi
 rm -rf /tmp/aethermind-ci-smoke
 
 PYTHONPATH=src "$PY" -m py_compile src/aethermind/*.py tools/*.py plugins/hermes/aethermind/*.py
+PYTHONPATH=src "$PY" -m py_compile __init__.py
 PYTHONPATH=src "$PY" -m pytest -q
 PYTHONPATH=src "$PY" -m aethermind.cli init --project-root /tmp/aethermind-ci-smoke/project >/tmp/aethermind-ci-smoke-init.json
 PYTHONPATH=src "$PY" -m aethermind.cli write-layer --project-root /tmp/aethermind-ci-smoke/project --type load-bearing --body "mission: ci smoke" --ctx "ci/smoke" --marker smoke >/tmp/aethermind-ci-smoke-write1.json
@@ -34,7 +35,7 @@ PYTHONPATH=src "$PY" -m aethermind.cli reorient --project-root /tmp/aethermind-c
 PYTHONPATH=src "$PY" -m aethermind.cli export --project-root /tmp/aethermind-ci-smoke/project --out /tmp/aethermind-ci-smoke/export.json >/tmp/aethermind-ci-smoke-export.json
 PYTHONPATH=src "$PY" -m aethermind.cli import --project-root /tmp/aethermind-ci-smoke/imported --in /tmp/aethermind-ci-smoke/export.json >/tmp/aethermind-ci-smoke-import.json
 PYTHONPATH=src "$PY" -m aethermind.cli manifest --project-root /tmp/aethermind-ci-smoke/imported >/tmp/aethermind-ci-smoke-manifest.json
-PYTHONPATH=src "$PY" tools/scan_public_surface.py --public-allowlist README.md docs src tools examples tests plugins scripts pyproject.toml LICENSE >/tmp/aethermind-ci-smoke-scan.json
+PYTHONPATH=src "$PY" tools/scan_public_surface.py --public-allowlist README.md docs src tools examples tests plugins skills scripts pyproject.toml plugin.yaml __init__.py LICENSE >/tmp/aethermind-ci-smoke-scan.json
 PYTHONPATH=src "$PY" tools/validate_aem_store.py --project-root examples/minimal-project >/tmp/aethermind-ci-smoke-fixture.json
 PYTHONPATH=src "$PY" tools/replay_aem_context.py --project-root examples/minimal-project --ctx-prefix example/ >/tmp/aethermind-ci-smoke-replay.json
 

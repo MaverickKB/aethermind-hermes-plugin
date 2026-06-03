@@ -6,7 +6,18 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
-SKIP_DIRS = {".git", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache", ".venv", "venv", "dist", "build"}
+SKIP_DIRS = {
+    ".aethermind",
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+}
 TEXT_SUFFIXES = {".md", ".py", ".toml", ".yaml", ".yml", ".txt", ".aem", ".json", ".sh"}
 DISALLOWED_FILENAMES = {".DS_Store"}
 
@@ -30,7 +41,7 @@ def iter_files(paths: Iterable[Path]) -> Iterable[Path]:
                 yield path
             continue
         for child in path.rglob("*"):
-            if any(part in SKIP_DIRS for part in child.parts):
+            if any(part in SKIP_DIRS or part.endswith(".egg-info") for part in child.parts):
                 continue
             if child.is_file() and (child.name in DISALLOWED_FILENAMES or child.suffix in TEXT_SUFFIXES or child.name in {"LICENSE", "README", "README.md"}):
                 yield child

@@ -35,7 +35,7 @@ copy_path() {
   fi
 }
 
-for path in README.md LICENSE pyproject.toml docs src tools tests examples plugins scripts/ci-local.sh; do
+for path in README.md LICENSE pyproject.toml plugin.yaml __init__.py docs src tools tests examples plugins skills scripts/ci-local.sh; do
   copy_path "$path"
 done
 
