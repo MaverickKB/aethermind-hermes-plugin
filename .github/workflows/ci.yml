@@ -1,7 +1,6 @@
 name: CI
 
-# Requires `nous-continuity-validation-kit` submodule URL to be a **public** cloneable remote
-# before this passes on GitHub-hosted runners (today `.gitmodules` is a relative local path).
+# Submodule URL: https://github.com/MaverickKB/nous-continuity-validation-kit.git (public).
 
 on:
   push:
