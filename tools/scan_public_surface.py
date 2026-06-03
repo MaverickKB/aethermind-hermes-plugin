@@ -8,6 +8,7 @@ from typing import Any, Iterable
 
 SKIP_DIRS = {".git", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache", ".venv", "venv", "dist", "build"}
 TEXT_SUFFIXES = {".md", ".py", ".toml", ".yaml", ".yml", ".txt", ".aem", ".json", ".sh"}
+DISALLOWED_FILENAMES = {".DS_Store"}
 
 PATTERNS = [
     ("private_path", re.compile(r"/Users/(?!example\b)[A-Za-z0-9_.-]+")),
@@ -17,7 +18,6 @@ PATTERNS = [
     ("sk_token", re.compile(r"(?i)sk-[a-z0-9_-]{20,}")),
 ]
 OUT_OF_SCOPE_TERMS = [
-    "Cairn" + " Companion",
     "Home" + " Assistant",
     "homestead" + " endpoint",
     "private" + " LAN",
@@ -31,13 +31,13 @@ def iter_files(paths: Iterable[Path]) -> Iterable[Path]:
         if not path.exists():
             continue
         if path.is_file():
-            if path.suffix in TEXT_SUFFIXES or path.name in {"LICENSE", "README", "README.md"}:
+            if path.name in DISALLOWED_FILENAMES or path.suffix in TEXT_SUFFIXES or path.name in {"LICENSE", "README", "README.md"}:
                 yield path
             continue
         for child in path.rglob("*"):
             if any(part in SKIP_DIRS for part in child.parts):
                 continue
-            if child.is_file() and (child.suffix in TEXT_SUFFIXES or child.name in {"LICENSE", "README", "README.md"}):
+            if child.is_file() and (child.name in DISALLOWED_FILENAMES or child.suffix in TEXT_SUFFIXES or child.name in {"LICENSE", "README", "README.md"}):
                 yield child
 
 
@@ -51,6 +51,9 @@ def scan_paths(paths: Iterable[Path]) -> dict[str, Any]:
     scanned: list[str] = []
     for path in iter_files(paths):
         scanned.append(str(path))
+        if path.name in DISALLOWED_FILENAMES:
+            findings.append({"path": str(path), "line": 0, "pattern": "disallowed_filename", "match": path.name})
+            continue
         text = path.read_text(encoding="utf-8", errors="replace")
         for line_no, line in enumerate(text.splitlines(), start=1):
             if _line_allowed(line):

@@ -10,7 +10,7 @@ __pycache__/
 build/
 dist/
 
-# Local Cairn/Hermes continuity and planning surfaces; not product distribution.
+# Local continuity and planning surfaces; not product distribution.
 /.hermes/
 /.aethermind/
 /CORTEX.md

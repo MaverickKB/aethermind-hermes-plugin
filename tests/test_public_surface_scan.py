@@ -34,3 +34,15 @@ def test_scanner_allows_marked_literal_examples(tmp_path: Path) -> None:
     report = scan_paths([doc])
 
     assert report["valid"] is True
+
+
+def test_scanner_flags_macos_finder_metadata(tmp_path: Path) -> None:
+    metadata = tmp_path / ".DS_Store"
+    metadata.write_bytes(b"metadata")
+
+    report = scan_paths([tmp_path])
+
+    assert report["valid"] is False
+    assert report["findings"]
+    assert report["findings"][0]["pattern"] == "disallowed_filename"
+    assert report["findings"][0]["match"] == ".DS_Store"

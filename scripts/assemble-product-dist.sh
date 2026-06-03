@@ -50,6 +50,7 @@ find "$DROP" \( \
   -name dist \
 \) -prune -exec rm -rf {} + 2>/dev/null || true
 find "$DROP" \( -name '*.pyc' -o -name '*.pyo' \) -delete
+find "$DROP" -name .DS_Store -delete
 
 (
   cd "$DROP"
