@@ -14,6 +14,14 @@ else
   PY="python3"
 fi
 
+if ! PYTHONPATH=src "$PY" -c 'import pytest' >/dev/null 2>&1; then
+  CI_VENV="$(mktemp -d /tmp/aethermind-ci-venv.XXXXXX)"
+  trap 'rm -rf "$CI_VENV"' EXIT
+  "$PY" -m venv "$CI_VENV"
+  "$CI_VENV/bin/python" -m pip install -q --upgrade pip pytest
+  PY="$CI_VENV/bin/python"
+fi
+
 rm -rf /tmp/aethermind-ci-smoke
 
 PYTHONPATH=src "$PY" -m py_compile src/aethermind/*.py tools/*.py plugins/hermes/aethermind/*.py
