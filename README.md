@@ -1,8 +1,14 @@
 # AetherMind — OSS shippable (continuity primitive)
 
 **Product:** Continuity primitive — spec, validators, human-readable `.aem` contract, reference
-Hermes plugin, **local** validation gates. **Git is a local continuity asset** (working copy +
-optional bare on your mesh); there is **no** GitHub requirement for this program.
+Hermes plugin, **local** validation gates.
+
+**This repo’s project store (Ember / Atlas contract):** The `.git/` tree here is **local backup**
+and **root authority** for this line of work — not a mirror whose “real” copy lives on a public
+forge. **Check in and commit often**; small frequent commits are **correct** here. **Standard**
+remote-first etiquette (squash-only history, rare commits, PR polish as the gate) **does not
+apply**. Optional **your** bare remote (e.g. mesh-git on the NAS) is still **your** continuity
+plane. A **third-party git forge** is not continuity or publish authority for this program.
 
 **Private canon (policy + lineage):**  
 `file:///Users/kbandoly/Programming/personhood-stack/docs/aethermind_three_shippable_roots.md`  
@@ -46,7 +52,8 @@ git branch --unset-upstream main 2>/dev/null || true
 
 ## Local CI (authoritative)
 
-No `.github/workflows` — run before tags or release handoff:
+No vendor-hosted CI config in-repo — the gate is the script below (run before tags or release
+handoff):
 
 ```bash
 ./scripts/ci-local.sh
