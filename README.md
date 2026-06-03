@@ -6,7 +6,7 @@ load-bearing parts of prior work: decisions, corrections, uncertainty, pressure,
 rationale, and local salience.
 
 AetherMind is not a generic memory database, transcript archive, task ledger, or
-chat log. The current public baseline uses TOML-style records because they are
+chat log. The current baseline uses TOML-style records because they are
 portable and easy to inspect, but human readability is not the invariant. The
 invariant is compact machine-readable continuity that is cheap for agents to scan
 and reorient from.
@@ -57,22 +57,20 @@ All CLI commands emit JSON.
 
 ## Product boundary
 
-Included in this OSS package:
+Included in this package:
 
 - `.aem` baseline continuity store contract
 - Python library and CLI
 - store validation, privacy checks, density warnings, and integrity manifests
 - export/import helpers
 - optional Hermes reference adapter
-- public docs and examples
+- docs and examples
 
 Not included:
 
-- private production orchestration
-- benchmark/evidence/proof packets
 - generic memory, broad recall, transcript storage, or task logging
-- paid-tier coordinator, licensing, CRM, or deployment internals
-- any operator-specific home/lab automation or identity surface
+- deployment-specific orchestration
+- benchmark, evidence, or reviewer packets
 
 ## Documentation
 
@@ -81,7 +79,6 @@ Not included:
 - `docs/CLI.md` — command examples
 - `docs/HERMES_PLUGIN.md` — optional Hermes adapter
 - `docs/PRIVACY.md` — what not to write into layers
-- `docs/ROADMAP.md` — OSS primitive and future boundaries
 
 ## License
 

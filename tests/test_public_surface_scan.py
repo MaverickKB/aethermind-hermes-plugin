@@ -7,7 +7,7 @@ from tools.scan_public_surface import scan_paths
 
 def test_scanner_flags_private_absolute_path(tmp_path: Path) -> None:
     doc = tmp_path / "README.md"
-    private_path = "/Users/" + "kbandoly/Programming/private"
+    private_path = "/Users/" + "localuser/Programming/private"
     doc.write_text(f"Private path: {private_path}\n", encoding="utf-8")
 
     report = scan_paths([doc])

@@ -1,7 +1,7 @@
 # Hermes adapter
 
-This directory contains an optional reference adapter that exposes the AetherMind
-OSS package through Hermes plugin tools.
+This directory contains an optional reference adapter that exposes the
+AetherMind package through Hermes plugin tools.
 
 The adapter is not the architecture center. It imports `aethermind.core` and
 registers Hermes tools over the same library/CLI behavior used by the package.

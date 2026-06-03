@@ -17,11 +17,6 @@ PATTERNS = [
     ("bearer_token", re.compile(r"(?i)bearer\s+[a-z0-9._-]{16,}")),
     ("sk_token", re.compile(r"(?i)sk-[a-z0-9_-]{20,}")),
 ]
-OUT_OF_SCOPE_TERMS = [
-    "Home" + " Assistant",
-    "homestead" + " endpoint",
-    "private" + " LAN",
-]
 ALLOW_LITERAL_MARKERS = ("literal example", "example only", "example:")
 
 
@@ -61,9 +56,6 @@ def scan_paths(paths: Iterable[Path]) -> dict[str, Any]:
             for name, pattern in PATTERNS:
                 for match in pattern.finditer(line):
                     findings.append({"path": str(path), "line": line_no, "pattern": name, "match": match.group(0)})
-            for term in OUT_OF_SCOPE_TERMS:
-                if term in line:
-                    findings.append({"path": str(path), "line": line_no, "pattern": "out_of_scope_term", "match": term})
     return {"valid": not findings, "scanned": scanned, "findings": findings}
 
 

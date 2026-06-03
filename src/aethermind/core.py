@@ -1,7 +1,7 @@
 """Harness-neutral AetherMind continuity substrate.
 
-This module implements the public baseline `.aem` store used by the OSS
-package. The current baseline encoding is TOML-style `[[layer]]` records because
+This module implements the public baseline `.aem` store used by the package. The
+current baseline encoding is TOML-style `[[layer]]` records because
 it is easy to inspect and easy to move across tools. The invariant is not human
 readability; the invariant is append-only, dense, machine-readable continuity
 that lets agents reorient cheaply without preserving full transcripts.

@@ -1,6 +1,6 @@
 # Scope
 
-AetherMind OSS is the continuity primitive: a compact, append-only project-local
+AetherMind is the continuity primitive: a compact, append-only project-local
 substrate that preserves working judgment for future agents.
 
 It is not generic memory. It is not transcript storage, broad recall, task
@@ -21,16 +21,13 @@ and recurrence.
 
 ## Out of scope
 
-- Private production orchestration or deployment claims.
 - Benchmark, evidence, proof, or reviewer packets.
 - Generic memory product positioning.
 - Transcript archives and task ledgers.
-- Paid coordinator, licensing, CRM, pricing, or enterprise internals.
-- Operator-specific automation, identity surfaces, or private runtime endpoints.
+- Deployment-specific orchestration.
 
 ## Product boundary
 
-AetherMind OSS ships the substrate behavior. Integrators own their UI, agent
-routing, policy, and deployment identity. Future commercial tiers may build on
-the same primitive, but this package stands alone and should work without any
-private service.
+AetherMind ships the substrate behavior. Integrators own their UI, agent
+routing, policy, and deployment identity. This package stands alone and should
+work without any external service.

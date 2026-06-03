@@ -67,7 +67,7 @@ def test_validation_fails_conf_out_of_range(tmp_path: Path) -> None:
 
 
 def test_validation_fails_private_path_in_body(tmp_path: Path) -> None:
-    private_path = "/Users/" + "kbandoly/private"
+    private_path = "/Users/" + "localuser/private"
     write_layers(tmp_path, layer_text(body=repr(f"operator path {private_path}")))
     report = core.evaluate_store(tmp_path)
     assert report["valid"] is False

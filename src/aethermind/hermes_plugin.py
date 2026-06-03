@@ -1,4 +1,4 @@
-"""Hermes plugin adapter for the AetherMind OSS continuity primitive."""
+"""Hermes plugin adapter for the AetherMind continuity primitive."""
 
 from __future__ import annotations
 

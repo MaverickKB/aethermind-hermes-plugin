@@ -1,6 +1,6 @@
 # `.aem` baseline format
 
-The current OSS package uses a TOML-style baseline representation under:
+The current package uses a TOML-style baseline representation under:
 
 ```text
 .aethermind/layers.aem
