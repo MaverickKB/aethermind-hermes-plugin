@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aethermind"
+version = "0.1.0"
+description = "Dense project-local continuity layers for AI agents."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [{name = "Ken Bandoly"}]
+keywords = ["ai", "agents", "continuity", "context", "aethermind"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+aethermind = "aethermind.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

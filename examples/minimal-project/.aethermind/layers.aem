@@ -1,0 +1,21 @@
+[[layer]]
+id = "seed-mission"
+ts = "2026-06-03T00:00:00Z"
+author = "aethermind-example"
+type = "load-bearing"
+body = "mission: demonstrate compact project-local continuity"
+ctx = "example/mission"
+conf = 1.0
+markers = ["mission", "example"]
+primitive = "layer"
+
+[[layer]]
+id = "seed-pressure"
+ts = "2026-06-03T00:01:00Z"
+author = "aethermind-example"
+type = "friction"
+body = "pressure: avoid turning .aem layers into task logs"
+ctx = "example/pressure"
+conf = 1.0
+markers = ["pressure", "density"]
+primitive = "layer"
