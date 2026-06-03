@@ -7,28 +7,25 @@ reference harness adapters, CI, redacted benchmark pointers.
 `file:///Users/kbandoly/Programming/personhood-stack/docs/aethermind_three_shippable_roots.md`  
 `file:///Users/kbandoly/Programming/personhood-stack/docs/aethermind_distribution_provenance.md`
 
-**Staging / kit source today:** `AetherMind-Release-Evidence/nous-continuity-validation-kit/` (exists
-on Ken’s Mac — verified 2026-06-04).
+**Hermes validation kit (submodule):** `nous-continuity-validation-kit` →
+`https://github.com/MaverickKB/nous-continuity-validation-kit.git` (clone with
+`git clone --recurse-submodules`).
 
-## Bring the kit into this repo
+## Publish this repo (first time)
 
-**Submodule (preferred once Git allows local clones):**
+`gh` may be unavailable on this machine — create an **empty** public repo on GitHub (e.g.
+`MaverickKB/aethermind-oss`), then:
 
 ```bash
 cd /Users/kbandoly/Programming/aethermind-oss
-# If `git submodule add` fails with: transport 'file' not allowed
-git -c protocol.file.allow=always submodule add \
-  ../../AetherMind-Release-Evidence/nous-continuity-validation-kit \
-  nous-continuity-validation-kit
+git remote add origin https://github.com/MaverickKB/aethermind-oss.git   # adjust owner/repo
+git push -u origin main --tags
 ```
 
-**Alternatives:** `git subtree add` from the kit repo; or `rsync -a --delete` (loses shared
-history — use only as last resort).
-
-**Stranger clones:** `.gitmodules` currently points at a **relative local path** valid only on
-this dev layout. Before public OSS launch, repoint `url` to the **public** kit remote (or
-vendor a copy) so `git clone --recurse-submodules` works off GitHub.
+CI runs on **push** to `main` (see `.github/workflows/ci.yml`).
 
 ## North star (optional research, not OSS requirement)
+
+`personhood-stack/docs/continuity_north_star.md` — not required for OSS installs.
 
 Do not commit secrets. OSS must remain stranger-runnable (no homestead paths).
