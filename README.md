@@ -33,6 +33,17 @@ git -c protocol.file.allow=always submodule update --init --recursive
 If `protocol.file` is blocked, use the same `git -c protocol.file.allow=always` flag for the
 initial submodule clone.
 
+**Stale `origin` in the nested kit:** older checkouts may still have a third-party `origin` inside
+`nous-continuity-validation-kit` while `.gitmodules` already points at the local evidence path.
+That remote is **not** part of the shippable contract — remove it so continuity matches mesh-git /
+local-only policy:
+
+```bash
+cd nous-continuity-validation-kit
+git remote remove origin 2>/dev/null || true
+git branch --unset-upstream main 2>/dev/null || true
+```
+
 ## Local CI (authoritative)
 
 No `.github/workflows` — run before tags or release handoff:
