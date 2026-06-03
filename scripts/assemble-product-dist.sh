@@ -58,7 +58,7 @@ find "$DROP" \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
 (
   cd "$STAGING"
-  COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TARBALL" "$NAME"
+  COPYFILE_DISABLE=1 tar --no-xattrs --no-fflags -czf "$TARBALL" "$NAME"
   shasum -a 256 "$(basename "$TARBALL")" > "$TARBALL.sha256"
 )
 
