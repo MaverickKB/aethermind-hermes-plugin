@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 SKIP_DIRS = {".git", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache", ".venv", "venv", "dist", "build"}
-TEXT_SUFFIXES = {".md", ".py", ".toml", ".yaml", ".yml", ".txt", ".aem", ".json"}
+TEXT_SUFFIXES = {".md", ".py", ".toml", ".yaml", ".yml", ".txt", ".aem", ".json", ".sh"}
 
 PATTERNS = [
     ("private_path", re.compile(r"/Users/(?!example\b)[A-Za-z0-9_.-]+")),
