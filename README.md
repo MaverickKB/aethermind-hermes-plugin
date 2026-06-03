@@ -72,6 +72,9 @@ git push -u origin main --tags
 SSH alias **`bandolynas`**, paths, and access are defined in the **mesh-git** skill
 (`~/.codex/skills/mesh-git/SKILL.md`).
 
+**Redacted public drops:** assemble reviewed tarballs / reviewer trees under sibling root
+`../aethermind-distributable-staging` (its `README.md` links this doc and private canon).
+
 ## North star (optional research)
 
 `personhood-stack/docs/continuity_north_star.md` — not required for OSS validation.
