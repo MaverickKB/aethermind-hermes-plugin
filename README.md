@@ -86,3 +86,8 @@ Not included:
 ## License
 
 Apache-2.0. See `LICENSE`.
+
+You may use, copy, modify, and distribute this project, including in commercial
+software, as long as you keep the license and copyright notices. The license also
+includes an express patent grant from contributors. The project is provided as
+is, without warranty.

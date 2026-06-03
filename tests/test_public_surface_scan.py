@@ -18,7 +18,7 @@ def test_scanner_flags_private_absolute_path(tmp_path: Path) -> None:
 
 
 def test_scanner_passes_safe_public_docs(tmp_path: Path) -> None:
-    doc = tmp_path / "README.public.md"
+    doc = tmp_path / "README.md"
     doc.write_text("# AetherMind\n\nA continuity primitive for local project stores.\n", encoding="utf-8")
 
     report = scan_paths([doc])

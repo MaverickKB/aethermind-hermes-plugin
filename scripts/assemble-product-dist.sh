@@ -35,7 +35,7 @@ copy_path() {
   fi
 }
 
-for path in README.md README.public.md LICENSE pyproject.toml SECURITY.md CONTRIBUTING.md docs src tools tests examples plugins scripts/ci-local.sh; do
+for path in README.md LICENSE pyproject.toml SECURITY.md CONTRIBUTING.md docs src tools tests examples plugins scripts/ci-local.sh; do
   copy_path "$path"
 done
 
