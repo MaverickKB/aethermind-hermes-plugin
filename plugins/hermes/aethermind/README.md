@@ -6,6 +6,28 @@ OSS package through Hermes plugin tools.
 The adapter is not the architecture center. It imports `aethermind.core` and
 registers Hermes tools over the same library/CLI behavior used by the package.
 
+## Recommended user install
+
+Use the packaged entry-point plugin instead of copying this directory:
+
+```bash
+HERMES_AGENT_ROOT="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}"
+uv pip install --python "$HERMES_AGENT_ROOT/venv/bin/python" /path/to/aethermind
+hermes plugins enable aethermind
+hermes plugins list
+```
+
+The entry point is declared as:
+
+```toml
+[project.entry-points."hermes_agent.plugins"]
+aethermind = "aethermind.hermes_plugin"
+```
+
+This directory remains for source-tree and compatibility testing.
+
+## Smoke test
+
 Smoke test against a local Hermes checkout:
 
 ```bash

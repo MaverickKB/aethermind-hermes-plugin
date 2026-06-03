@@ -19,6 +19,15 @@ From a checkout:
 python3 -m pip install -e .
 ```
 
+For Hermes, install AetherMind into Hermes' virtualenv and enable the packaged
+entry-point plugin:
+
+```bash
+HERMES_AGENT_ROOT="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}"
+uv pip install --python "$HERMES_AGENT_ROOT/venv/bin/python" .
+hermes plugins enable aethermind
+```
+
 ## Quick start
 
 ```bash

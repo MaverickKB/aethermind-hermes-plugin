@@ -23,5 +23,8 @@ classifiers = [
 [project.scripts]
 aethermind = "aethermind.cli:main"
 
+[project.entry-points."hermes_agent.plugins"]
+aethermind = "aethermind.hermes_plugin"
+
 [tool.setuptools.packages.find]
 where = ["src"]
