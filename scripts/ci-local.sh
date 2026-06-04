@@ -189,6 +189,8 @@ with tempfile.TemporaryDirectory(prefix="aethermind-plugin-hooks-") as tmp:
         raise SystemExit("pre_llm_call context missing enforcement header")
     if "aethermind_write_layer" not in context:
         raise SystemExit("pre_llm_call context missing write-tool instruction")
+    if "at least one concise marker" not in context:
+        raise SystemExit("pre_llm_call context missing marker instruction")
     if "Hook retrieval test layer." not in context:
         raise SystemExit("pre_llm_call context did not include retrieved layer")
 
