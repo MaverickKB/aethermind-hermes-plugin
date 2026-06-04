@@ -14,6 +14,10 @@ before touching the same project again.
 - Evaluating store schema, density, privacy, and retrieval signals.
 - Exporting, importing, and hashing `.aem` stores.
 - Registering those behaviors as Hermes tools.
+- Automatically initializing and reading the project-local store through Hermes
+  lifecycle hooks.
+- Injecting compact continuity guidance before model calls so AetherMind use is
+  part of the normal session flow.
 
 ## Out Of Scope
 
@@ -25,4 +29,5 @@ before touching the same project again.
 - Benchmark or review packets.
 
 Integrators own their UI, routing, policy, and deployment identity. The plugin
-only provides local continuity tools.
+provides local continuity tools and Hermes lifecycle enforcement for those
+tools.

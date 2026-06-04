@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ from . import aem_store
 
 TOOLSET = "aethermind"
 PLUGIN_ROOT = Path(__file__).resolve().parent
+AUTO_CONTEXT_LIMIT = 6
 
 
 def _json(data: dict[str, Any]) -> str:
@@ -96,6 +98,67 @@ def _import_layers_handler(args: dict[str, Any], **_kwargs: Any) -> str:
 
 def _integrity_manifest_handler(args: dict[str, Any], **_kwargs: Any) -> str:
     return _json(aem_store.integrity_manifest(str(args["project_root"])))
+
+
+def _hook_project_root(kwargs: dict[str, Any]) -> Path:
+    raw = (
+        kwargs.get("project_root")
+        or os.environ.get("AETHERMIND_PROJECT_ROOT")
+        or os.environ.get("HERMES_PROJECT_ROOT")
+        or os.getcwd()
+    )
+    return Path(str(raw)).expanduser().resolve()
+
+
+def _format_layer_for_context(layer: dict[str, Any]) -> str:
+    markers = ", ".join(str(marker) for marker in layer.get("markers", []))
+    marker_text = f" markers=[{markers}]" if markers else ""
+    return (
+        f"- {layer.get('type', 'layer')} {layer.get('ctx', '')}{marker_text}: "
+        f"{layer.get('body', '')}"
+    ).strip()
+
+
+def _aethermind_session_start(**kwargs: Any) -> None:
+    root = _hook_project_root(kwargs)
+    aem_store.init_store(root)
+
+
+def _aethermind_pre_llm_call(**kwargs: Any) -> dict[str, str]:
+    root = _hook_project_root(kwargs)
+    user_message = str(kwargs.get("user_message") or "")
+    try:
+        aem_store.init_store(root)
+        bundle = aem_store.reorient(root, task=user_message, limit=AUTO_CONTEXT_LIMIT)
+        layers = bundle.get("continuity_bundle") or []
+        if layers:
+            rendered_layers = "\n".join(_format_layer_for_context(layer) for layer in layers)
+        else:
+            rendered_layers = "- No AetherMind layers exist for this project yet."
+        context = (
+            "[AetherMind automatic continuity is active]\n"
+            f"Project root for AetherMind tools: {root}\n"
+            "The AetherMind store has been initialized/read before this model call.\n"
+            "Use the aethermind_* tools for this project. When the turn produces a "
+            "load-bearing decision, correction, discovery, friction, or uncertainty, "
+            "call aethermind_write_layer with this project_root. For meaningful work, "
+            "also call aethermind_write_texture with a compact attention pointer. "
+            "Do not write secrets, credentials, raw transcripts, or private prompt text.\n"
+            "Relevant AetherMind layers:\n"
+            f"{rendered_layers}\n"
+            "[/AetherMind automatic continuity]"
+        )
+        return {"context": context}
+    except Exception as exc:
+        return {
+            "context": (
+                "[AetherMind automatic continuity is active but degraded]\n"
+                f"Project root attempted: {root}\n"
+                f"Initialization/read failed: {exc}\n"
+                "If this is a real project, use aethermind_init_store or choose a writable project root before continuing.\n"
+                "[/AetherMind automatic continuity]"
+            )
+        }
 
 
 def _object_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -246,6 +309,14 @@ def _register_skills(ctx) -> None:
             register_skill(child.name, skill_md, _skill_description(skill_md))
 
 
+def _register_hooks(ctx) -> None:
+    register_hook = getattr(ctx, "register_hook", None)
+    if register_hook is None:
+        return
+    register_hook("on_session_start", _aethermind_session_start)
+    register_hook("pre_llm_call", _aethermind_pre_llm_call)
+
+
 def register(ctx) -> None:
     for name, description, parameters, handler in TOOL_SPECS:
         ctx.register_tool(
@@ -259,3 +330,4 @@ def register(ctx) -> None:
             handler=handler,
         )
     _register_skills(ctx)
+    _register_hooks(ctx)

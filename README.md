@@ -5,6 +5,10 @@ append-only `.aem` records beside a project so future agent sessions can recover
 the decisions, corrections, uncertainty, and pressure that matter without
 preserving full transcripts.
 
+When enabled, the plugin also registers Hermes lifecycle hooks. Fresh Hermes
+sessions automatically initialize/read the project `.aethermind` store and
+inject a short AetherMind continuity block before model calls.
+
 This repository is the Hermes plugin distribution. It is intentionally small:
 
 - `plugin.yaml` and `__init__.py` are the Hermes plugin entry point.
@@ -21,6 +25,33 @@ hermes plugins list
 
 Restart Hermes after enabling the plugin. In a running Hermes session,
 `/plugins` should show `aethermind`.
+
+After restart, run Hermes from the project directory you want AetherMind to
+cover. The plugin uses the process working directory as the default project
+root. You can override it with `AETHERMIND_PROJECT_ROOT`.
+
+## Automatic Use
+
+The plugin registers:
+
+- `on_session_start`, which creates `.aethermind/layers.aem` and
+  `.aethermind/texture.aem` for the current project if they do not exist.
+- `pre_llm_call`, which reads relevant layers and injects an AetherMind
+  continuity block into the current user turn.
+
+That injected block tells the agent to use the `aethermind_*` tools and to write
+layers for load-bearing decisions, corrections, discoveries, friction, or
+uncertainty. The plugin does not fabricate routine task-summary layers; it
+keeps meaningful layer creation tied to actual project work.
+
+The companion skill is plugin-qualified:
+
+```text
+aethermind:aethermind-continuity
+```
+
+Hermes exposes that skill through `skill_view`. It is not copied into
+`~/.hermes/skills` and does not appear in the flat skills list.
 
 ## Tools
 
@@ -63,8 +94,8 @@ From the repository root:
 ```
 
 The validation script compiles the plugin, smoke-tests the Hermes registration
-surface, verifies the example store, and scans the public files for common
-publishing mistakes.
+surface, verifies lifecycle hook behavior, checks the example store, and scans
+the public files for common publishing mistakes.
 
 ## Documentation
 

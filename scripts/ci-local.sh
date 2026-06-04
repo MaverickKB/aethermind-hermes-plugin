@@ -61,12 +61,16 @@ class CaptureContext:
     def __init__(self) -> None:
         self.tools = {}
         self.skills = {}
+        self.hooks = {}
 
     def register_tool(self, *, name, toolset, schema, handler, **_kwargs):
         self.tools[name] = {"toolset": toolset, "schema": schema, "handler": handler}
 
     def register_skill(self, name, path, description=""):
         self.skills[name] = {"path": str(path), "description": description}
+
+    def register_hook(self, hook_name, callback):
+        self.hooks.setdefault(hook_name, []).append(callback)
 
 
 spec = importlib.util.spec_from_file_location(
@@ -102,6 +106,9 @@ if set(ctx.tools) != expected_tools:
     raise SystemExit(f"unexpected tools: {sorted(ctx.tools)}")
 if "aethermind-continuity" not in ctx.skills:
     raise SystemExit("skill registration missing")
+for hook_name in ("on_session_start", "pre_llm_call"):
+    if hook_name not in ctx.hooks or len(ctx.hooks[hook_name]) != 1:
+        raise SystemExit(f"{hook_name} hook registration missing")
 
 with tempfile.TemporaryDirectory(prefix="aethermind-plugin-smoke-") as tmp:
     project = Path(tmp) / "project"
@@ -140,6 +147,50 @@ with tempfile.TemporaryDirectory(prefix="aethermind-plugin-smoke-") as tmp:
 
 if not (init["ok"] and write["ok"] and texture["ok"] and report["valid"] and imported["ok"] and imported_report["valid"]):
     raise SystemExit("plugin smoke failed")
+
+with tempfile.TemporaryDirectory(prefix="aethermind-plugin-hooks-") as tmp:
+    project = Path(tmp) / "project"
+    project.mkdir()
+    previous_cwd = Path.cwd()
+    try:
+        import os
+
+        os.chdir(project)
+        if (project / ".aethermind").exists():
+            raise SystemExit("hook test project unexpectedly has an AetherMind store")
+        ctx.hooks["on_session_start"][0](session_id="ci-session", model="ci-model", platform="cli")
+        if not (project / ".aethermind" / "layers.aem").exists():
+            raise SystemExit("on_session_start did not initialize layers.aem")
+        ctx.tools["aethermind_write_layer"]["handler"](
+            {
+                "project_root": str(project),
+                "type": "discovery",
+                "body": "Hook retrieval test layer.",
+                "ctx": "ci/hook",
+                "markers": ["hook"],
+            }
+        )
+        hook_result = ctx.hooks["pre_llm_call"][0](
+            session_id="ci-session",
+            task_id="ci-task",
+            turn_id="ci-turn",
+            user_message="Need hook retrieval",
+            conversation_history=[],
+            is_first_turn=True,
+            model="ci-model",
+            platform="cli",
+        )
+    finally:
+        os.chdir(previous_cwd)
+    if not isinstance(hook_result, dict) or "context" not in hook_result:
+        raise SystemExit("pre_llm_call hook did not return context")
+    context = hook_result["context"]
+    if "AetherMind automatic continuity is active" not in context:
+        raise SystemExit("pre_llm_call context missing enforcement header")
+    if "aethermind_write_layer" not in context:
+        raise SystemExit("pre_llm_call context missing write-tool instruction")
+    if "Hook retrieval test layer." not in context:
+        raise SystemExit("pre_llm_call context did not include retrieved layer")
 
 skip_dirs = {".git", ".aethermind", "__pycache__", ".pytest_cache", ".cairn"}
 text_suffixes = {".md", ".py", ".yaml", ".yml", ".txt", ".aem", ".sh"}
