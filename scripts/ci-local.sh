@@ -8,7 +8,27 @@ trap 'find "$ROOT" -name __pycache__ -prune -exec rm -rf {} +; find "$ROOT" -nam
 if [ -n "${PYTHON:-}" ]; then
   PY="$PYTHON"
 else
-  PY="python3"
+  PY=""
+  hermes_venv_python="$ROOT/../../../../hermes-agent/venv/bin/python3"
+  for candidate in \
+    "$hermes_venv_python" \
+    python3.11 \
+    python3 \
+    python
+  do
+    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" - <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+PY
+    then
+      PY="$candidate"
+      break
+    fi
+  done
+  if [ -z "$PY" ]; then
+    echo "ci-local.sh requires Python >= 3.11 for stdlib tomllib" >&2
+    exit 1
+  fi
 fi
 
 "$PY" -m py_compile __init__.py aem_store.py cl2.py
