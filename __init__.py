@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from . import aem_store
+from . import aem_store, cl2
 
 TOOLSET = "aethermind"
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -77,6 +77,76 @@ def _reorient_handler(args: dict[str, Any], **_kwargs: Any) -> str:
     )
 
 
+def _cl2_brief_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(
+        cl2.brief(
+            str(args["project_root"]),
+            budget_tokens=int(args.get("budget_tokens") or 1200),
+            task_hint=str(args.get("task_hint") or ""),
+            ctx_now=str(args.get("ctx_now") or ""),
+        )
+    )
+
+
+def _cl2_store_health_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(cl2.store_health(str(args["project_root"])))
+
+
+def _cl2_nutrition_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    layer = {
+        "type": str(args["type"]),
+        "body": str(args["body"]),
+        "ctx": str(args.get("ctx") or ""),
+        "markers": args.get("markers"),
+        "severity": str(args.get("severity") or ""),
+        "evidence": args.get("evidence"),
+        "kind": str(args.get("kind") or ""),
+    }
+    return _json(cl2.nutrition_verdict(layer, aem_store.read_layers(str(args["project_root"]))))
+
+
+def _cl2_write_layer_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(
+        cl2.write_layer(
+            str(args["project_root"]),
+            layer_type=str(args["type"]),
+            body=str(args["body"]),
+            ctx=str(args["ctx"]),
+            author=str(args.get("author") or "hermes-aethermind-cl2"),
+            conf=float(args.get("conf") or 0.8),
+            markers=args.get("markers"),
+            mode=str(args.get("mode") or "lint"),
+            force_reason=str(args.get("force_reason") or ""),
+            evidence=args.get("evidence"),
+            verification=args.get("verification"),
+            supersedes=args.get("supersedes"),
+            recurrence_of=args.get("recurrence_of"),
+            review_after=str(args.get("review_after") or ""),
+            inherit=str(args.get("inherit") or "posture"),
+            action_rule=str(args.get("action_rule") or ""),
+            scope=str(args.get("scope") or "repo"),
+            severity=str(args.get("severity") or ""),
+            domain=str(args.get("domain") or ""),
+        )
+    )
+
+
+def _cl2_capsule_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(
+        cl2.capsule(
+            str(args["project_root"]),
+            posture=str(args.get("posture") or ""),
+            open_items=str(args.get("open") or args.get("open_items") or ""),
+            next_step=str(args.get("next") or args.get("next_step") or ""),
+            invalid=str(args.get("invalid") or ""),
+            ctx=str(args.get("ctx") or "boundary/capture"),
+            author=str(args.get("author") or "hermes-aethermind-cl2"),
+            mode=str(args.get("mode") or "lint"),
+            force_reason=str(args.get("force_reason") or ""),
+        )
+    )
+
+
 def _evaluate_store_handler(args: dict[str, Any], **_kwargs: Any) -> str:
     return _json(aem_store.evaluate_store(str(args["project_root"])))
 
@@ -113,8 +183,9 @@ def _hook_project_root(kwargs: dict[str, Any]) -> Path:
 def _format_layer_for_context(layer: dict[str, Any]) -> str:
     markers = ", ".join(str(marker) for marker in layer.get("markers", []))
     marker_text = f" markers=[{markers}]" if markers else ""
+    why = f" riv={layer.get('riv')} why={layer.get('why')}" if layer.get("riv") is not None else ""
     return (
-        f"- {layer.get('type', 'layer')} {layer.get('ctx', '')}{marker_text}: "
+        f"- {layer.get('type', 'layer')} {layer.get('ctx', '')}{marker_text}{why}: "
         f"{layer.get('body', '')}"
     ).strip()
 
@@ -129,24 +200,30 @@ def _aethermind_pre_llm_call(**kwargs: Any) -> dict[str, str]:
     user_message = str(kwargs.get("user_message") or "")
     try:
         aem_store.init_store(root)
-        bundle = aem_store.reorient(root, task=user_message, limit=AUTO_CONTEXT_LIMIT)
-        layers = bundle.get("continuity_bundle") or []
+        budget = int(os.environ.get("AETHERMIND_CL2_AUTO_BUDGET", "900") or "900")
+        bundle = cl2.brief(root, budget_tokens=budget, task_hint=user_message, ctx_now=str(root))
+        layers = bundle.get("included") or []
         if layers:
             rendered_layers = "\n".join(_format_layer_for_context(layer) for layer in layers)
         else:
             rendered_layers = "- No AetherMind layers exist for this project yet."
+        facts = bundle.get("facts_referred") or []
+        fact_text = ""
+        if facts:
+            fact_lines = [f"- {fact.get('claim_hint')} -> {fact.get('backend')}:{fact.get('ref')}" for fact in facts]
+            fact_text = "\nFact-shaped records were not injected as posture; look them up deliberately if needed:\n" + "\n".join(fact_lines)
         context = (
-            "[AetherMind automatic continuity is active]\n"
+            "[AetherMind CL2 automatic continuity is active]\n"
             f"Project root for AetherMind tools: {root}\n"
-            "The AetherMind store has been initialized/read before this model call.\n"
-            "Use the aethermind_* tools for this project. When the turn produces a "
-            "load-bearing decision, correction, discovery, friction, or uncertainty, "
-            "call aethermind_write_layer with this project_root and at least one concise marker. "
-            "For meaningful work, also call aethermind_write_texture with a compact attention pointer. "
+            f"CL2 brief budget used: {bundle.get('budget', {}).get('used')} / {bundle.get('budget', {}).get('requested')} est. tokens.\n"
+            "The store was initialized/read before this model call. The injected layers are ranked by Re-Inheritance Value: what should change the next action, not just recency.\n"
+            "Use the aethermind_* tools for this project. Prefer aethermind_cl2_brief/store_health/nutrition/write_layer/capsule when the task needs budgeted selection, write-quality guidance, or boundary capture. "
+            "When the turn produces a load-bearing decision, correction, discovery, friction, or uncertainty, write a compact layer and texture pointer. "
             "Do not write secrets, credentials, raw transcripts, or private prompt text.\n"
-            "Relevant AetherMind layers:\n"
-            f"{rendered_layers}\n"
-            "[/AetherMind automatic continuity]"
+            "Relevant CL2-selected AetherMind layers:\n"
+            f"{rendered_layers}"
+            f"{fact_text}\n"
+            "[/AetherMind CL2 automatic continuity]"
         )
         return {"context": context}
     except Exception as exc:
@@ -246,6 +323,94 @@ TOOL_SPECS = [
             ["project_root", "task"],
         ),
         _reorient_handler,
+    ),
+    (
+        "aethermind_cl2_brief",
+        "Build a CL2 budgeted Re-Inheritance Value brief: selected continuity that should change the next action, not just recent/topical layers.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "budget_tokens": {"type": "integer", "default": 1200},
+                "task_hint": {"type": "string"},
+                "ctx_now": {"type": "string"},
+            },
+            ["project_root"],
+        ),
+        _cl2_brief_handler,
+    ),
+    (
+        "aethermind_cl2_store_health",
+        "Report CL2 continuity-store health: density, nutrition, superseded counts, stale candidates, and SHA-256.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _cl2_store_health_handler,
+    ),
+    (
+        "aethermind_cl2_nutrition",
+        "Lint a would-be AetherMind layer for CL2 write quality without appending it.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "type": {"type": "string"},
+                "body": {"type": "string"},
+                "ctx": {"type": "string"},
+                "markers": TEXT_ARRAY,
+                "evidence": TEXT_ARRAY,
+                "severity": {"type": "string"},
+                "kind": {"type": "string"},
+            },
+            ["project_root", "type", "body"],
+        ),
+        _cl2_nutrition_handler,
+    ),
+    (
+        "aethermind_cl2_write_layer",
+        "Append a CL2-gated AetherMind layer with optional v2 fields; lint mode is default and capsules remain v1-compatible.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "type": {"type": "string"},
+                "body": {"type": "string"},
+                "ctx": {"type": "string"},
+                "author": {"type": "string"},
+                "conf": {"type": "number", "default": 0.8},
+                "markers": TEXT_ARRAY,
+                "mode": {"type": "string", "enum": ["lint", "coach", "strict"], "default": "lint"},
+                "force_reason": {"type": "string"},
+                "evidence": TEXT_ARRAY,
+                "verification": TEXT_ARRAY,
+                "supersedes": TEXT_ARRAY,
+                "recurrence_of": TEXT_ARRAY,
+                "review_after": {"type": "string"},
+                "inherit": {"type": "string", "enum": ["posture", "fact", "both"], "default": "posture"},
+                "action_rule": {"type": "string"},
+                "scope": {"type": "string"},
+                "severity": {"type": "string"},
+                "domain": {"type": "string"},
+            },
+            ["project_root", "type", "body", "ctx"],
+        ),
+        _cl2_write_layer_handler,
+    ),
+    (
+        "aethermind_cl2_capsule",
+        "Append a bounded CL2 boundary-capture capsule. Stores as type=load-bearing, kind=boundary, marker=boundary for v1 reader compatibility.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "posture": {"type": "string"},
+                "open": {"type": "string"},
+                "open_items": {"type": "string"},
+                "next": {"type": "string"},
+                "next_step": {"type": "string"},
+                "invalid": {"type": "string"},
+                "ctx": {"type": "string", "default": "boundary/capture"},
+                "author": {"type": "string"},
+                "mode": {"type": "string", "enum": ["lint", "coach", "strict"], "default": "lint"},
+                "force_reason": {"type": "string"},
+            },
+            ["project_root"],
+        ),
+        _cl2_capsule_handler,
     ),
     (
         "aethermind_evaluate_store",

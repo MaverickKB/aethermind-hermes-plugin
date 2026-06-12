@@ -23,9 +23,10 @@ Required fields:
 - `body`: compact continuity signal
 - `ctx`: routing context
 - `conf`: confidence from `0.0` to `1.0`
-- `markers`: retrieval markers
+- `markers`: retrieval markers; omitted markers are read as an empty list for legacy
+  stores, but new writes should include explicit markers when possible.
 
-Canonical layer types:
+Canonical v1 layer types for new writes:
 
 - `fork`
 - `friction`
@@ -36,7 +37,18 @@ Canonical layer types:
 
 Accepted optional fields include `evidence`, `verification`, `supersedes`,
 `rollback_of`, `recurrence_of`, `artifact`, `artifact_ref`, `anchor`, `ref`,
-`reason`, `scope`, and `severity`.
+`reason`, `scope`, `severity`, `kind`, `inherit`, `action_rule`, `review_after`,
+`domain`, `nutrition`, and `force_reason`.
+
+CL2 boundary capsules are intentionally v1-compatible. Until every configured
+reader accepts a raw `boundary` layer type, capsules are encoded as
+`type = "load-bearing"` with `kind = "boundary"` and marker `boundary`.
+
+Readers are lenient with legacy or extended stores: omitted `markers` are treated
+as `[]`, and non-canonical historical types such as `decision`, `thought`, or
+`runtime-validation` are readable. New plugin writes still enforce the canonical
+v1 type set unless a CL2 helper explicitly remaps the write into a compatible
+shape.
 
 ## Example
 

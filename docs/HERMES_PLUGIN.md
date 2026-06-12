@@ -30,7 +30,9 @@ The plugin registers two Hermes lifecycle hooks:
 - `on_session_start` initializes `.aethermind/layers.aem` and
   `.aethermind/texture.aem` for the current project root.
 - `pre_llm_call` reads task-relevant layers and injects a compact AetherMind
-  continuity block into the current user turn.
+  CL2 continuity block into the current user turn. CL2 selection uses a bounded
+  Re-Inheritance Value brief: records are ranked by what should change the next
+  action, not only by recency or topical similarity.
 
 By default, the project root is the Hermes process working directory. Set
 `AETHERMIND_PROJECT_ROOT` to force a specific root.
@@ -65,6 +67,11 @@ session starts.
 - `aethermind_write_texture`
 - `aethermind_read_texture`
 - `aethermind_reorient`
+- `aethermind_cl2_brief`
+- `aethermind_cl2_store_health`
+- `aethermind_cl2_nutrition`
+- `aethermind_cl2_write_layer`
+- `aethermind_cl2_capsule`
 - `aethermind_evaluate_store`
 - `aethermind_export_store`
 - `aethermind_import_layers`

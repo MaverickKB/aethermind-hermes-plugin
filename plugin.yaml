@@ -1,5 +1,5 @@
 name: aethermind
-version: 0.1.0
+version: 0.2.0
 description: Project-local continuity layers for Hermes agents.
 provides_tools:
   - aethermind_init_store
@@ -8,6 +8,11 @@ provides_tools:
   - aethermind_write_texture
   - aethermind_read_texture
   - aethermind_reorient
+  - aethermind_cl2_brief
+  - aethermind_cl2_store_health
+  - aethermind_cl2_nutrition
+  - aethermind_cl2_write_layer
+  - aethermind_cl2_capsule
   - aethermind_evaluate_store
   - aethermind_export_store
   - aethermind_import_layers

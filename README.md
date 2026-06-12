@@ -13,6 +13,7 @@ This repository is the Hermes plugin distribution. It is intentionally small:
 
 - `plugin.yaml` and `__init__.py` are the Hermes plugin entry point.
 - `aem_store.py` contains the local `.aem` store behavior.
+- `cl2.py` contains the CL2 upgrade layer: budgeted Re-Inheritance Value briefs, store-health/nutrition reporting, write-quality gating, and v1-compatible boundary capsules.
 - `skills/aethermind-continuity/` provides the companion Hermes skill.
 - `docs/` and `examples/` describe the public store contract.
 
@@ -63,10 +64,25 @@ The plugin registers:
 - `aethermind_write_texture`
 - `aethermind_read_texture`
 - `aethermind_reorient`
+- `aethermind_cl2_brief`
+- `aethermind_cl2_store_health`
+- `aethermind_cl2_nutrition`
+- `aethermind_cl2_write_layer`
+- `aethermind_cl2_capsule`
 - `aethermind_evaluate_store`
 - `aethermind_export_store`
 - `aethermind_import_layers`
 - `aethermind_integrity_manifest`
+
+The CL2 tools are the current upgraded surface. They keep v1 `.aem` compatibility while adding selection, quality, and boundary semantics:
+
+- `aethermind_cl2_brief` builds a budgeted Re-Inheritance Value brief.
+- `aethermind_cl2_store_health` reports density/nutrition and stale/superseded signals.
+- `aethermind_cl2_nutrition` lints a would-be layer without writing.
+- `aethermind_cl2_write_layer` appends with CL2 optional fields and lint/coach/strict modes.
+- `aethermind_cl2_capsule` writes POSTURE / OPEN / NEXT / INVALID boundary capture.
+
+Boundary capsules are encoded as `type = "load-bearing"`, `kind = "boundary"`, marker `boundary` until all configured readers support a raw CL2 `boundary` type.
 
 ## What AetherMind Is
 

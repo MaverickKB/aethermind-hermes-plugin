@@ -11,7 +11,7 @@ else
   PY="python3"
 fi
 
-"$PY" -m py_compile __init__.py aem_store.py
+"$PY" -m py_compile __init__.py aem_store.py cl2.py
 
 "$PY" - <<'PY'
 from __future__ import annotations
@@ -30,6 +30,7 @@ required = {
     "README.md",
     "__init__.py",
     "aem_store.py",
+    "cl2.py",
     "plugin.yaml",
     "docs/AEM_FORMAT.md",
     "docs/HERMES_PLUGIN.md",
@@ -52,7 +53,7 @@ for forbidden in ("src", "tests", "tools", "plugins", "pyproject.toml"):
         raise SystemExit(f"forbidden publish surface still present: {forbidden}")
 
 manifest = (root / "plugin.yaml").read_text(encoding="utf-8")
-for expected in ("name: aethermind", "aethermind_write_layer", "aethermind_reorient"):
+for expected in ("name: aethermind", "aethermind_write_layer", "aethermind_reorient", "aethermind_cl2_brief", "aethermind_cl2_capsule"):
     if expected not in manifest:
         raise SystemExit(f"plugin.yaml missing {expected!r}")
 
@@ -97,6 +98,11 @@ expected_tools = {
     "aethermind_write_texture",
     "aethermind_read_texture",
     "aethermind_reorient",
+    "aethermind_cl2_brief",
+    "aethermind_cl2_store_health",
+    "aethermind_cl2_nutrition",
+    "aethermind_cl2_write_layer",
+    "aethermind_cl2_capsule",
     "aethermind_evaluate_store",
     "aethermind_export_store",
     "aethermind_import_layers",
@@ -124,6 +130,37 @@ with tempfile.TemporaryDirectory(prefix="aethermind-plugin-smoke-") as tmp:
             }
         )
     )
+    cl2_capsule = json.loads(
+        ctx.tools["aethermind_cl2_capsule"]["handler"](
+            {
+                "project_root": str(project),
+                "posture": "Preserve v1 compatibility.",
+                "next": "Verify CL2 capsule writes as load-bearing kind boundary.",
+                "ctx": "smoke/boundary",
+            }
+        )
+    )
+    cl2_health = json.loads(ctx.tools["aethermind_cl2_store_health"]["handler"]({"project_root": str(project)}))
+    cl2_brief = json.loads(
+        ctx.tools["aethermind_cl2_brief"]["handler"](
+            {"project_root": str(project), "task_hint": "Verify CL2 capsule", "budget_tokens": 200}
+        )
+    )
+    cl2_nutrition = json.loads(
+        ctx.tools["aethermind_cl2_nutrition"]["handler"](
+            {
+                "project_root": str(project),
+                "type": "load-bearing",
+                "body": "POSTURE: preserve v1 compatibility; NEXT: verify CL2 tool exposure.",
+                "ctx": "smoke/nutrition",
+                "markers": ["!"],
+            }
+        )
+    )
+    if cl2_capsule["layer"]["type"] != "load-bearing" or cl2_capsule["layer"].get("kind") != "boundary":
+        raise SystemExit("CL2 capsule did not preserve v1-compatible boundary encoding")
+    if cl2_health["layer_count"] < 2 or not cl2_brief["included"] or cl2_nutrition["verdict"] != "dense":
+        raise SystemExit("CL2 smoke failed")
     texture = json.loads(
         ctx.tools["aethermind_write_texture"]["handler"](
             {"project_root": str(project), "body": "Smoke path is clean.", "ctx": "smoke/texture"}
@@ -145,7 +182,7 @@ with tempfile.TemporaryDirectory(prefix="aethermind-plugin-smoke-") as tmp:
         ctx.tools["aethermind_evaluate_store"]["handler"]({"project_root": str(imported_project)})
     )
 
-if not (init["ok"] and write["ok"] and texture["ok"] and report["valid"] and imported["ok"] and imported_report["valid"]):
+if not (init["ok"] and write["ok"] and cl2_capsule["ok"] and texture["ok"] and report["valid"] and imported["ok"] and imported_report["valid"]):
     raise SystemExit("plugin smoke failed")
 
 with tempfile.TemporaryDirectory(prefix="aethermind-plugin-hooks-") as tmp:
@@ -185,12 +222,12 @@ with tempfile.TemporaryDirectory(prefix="aethermind-plugin-hooks-") as tmp:
     if not isinstance(hook_result, dict) or "context" not in hook_result:
         raise SystemExit("pre_llm_call hook did not return context")
     context = hook_result["context"]
-    if "AetherMind automatic continuity is active" not in context:
-        raise SystemExit("pre_llm_call context missing enforcement header")
-    if "aethermind_write_layer" not in context:
-        raise SystemExit("pre_llm_call context missing write-tool instruction")
-    if "at least one concise marker" not in context:
-        raise SystemExit("pre_llm_call context missing marker instruction")
+    if "AetherMind CL2 automatic continuity is active" not in context:
+        raise SystemExit("pre_llm_call context missing CL2 enforcement header")
+    if "aethermind_cl2_brief" not in context:
+        raise SystemExit("pre_llm_call context missing CL2 tool instruction")
+    if "Re-Inheritance Value" not in context:
+        raise SystemExit("pre_llm_call context missing CL2 selection rationale")
     if "Hook retrieval test layer." not in context:
         raise SystemExit("pre_llm_call context did not include retrieved layer")
 

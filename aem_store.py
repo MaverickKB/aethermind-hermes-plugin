@@ -29,7 +29,7 @@ ALLOWED_LAYER_TYPES = {
 }
 
 PRESSURE_TYPES = {"friction", "correction", "uncertainty"}
-REQUIRED_FIELDS = {"id", "ts", "author", "type", "body", "ctx", "conf", "markers"}
+REQUIRED_FIELDS = {"id", "ts", "author", "type", "body", "ctx", "conf"}
 FORMAT_VERSION = "aethermind-aem-baseline-v1"
 
 PRIVATE_PATTERNS = [
@@ -108,12 +108,14 @@ def validate_layers(layers: list[dict[str, Any]]) -> list[str]:
         if missing:
             errors.append(f"layer {index} missing required fields: {missing}")
             continue
+        if "markers" not in item:
+            item["markers"] = []
         layer_id = str(item["id"])
         if layer_id in seen_ids:
             errors.append(f"duplicate layer id: {layer_id}")
         seen_ids.add(layer_id)
         if item["type"] not in ALLOWED_LAYER_TYPES:
-            errors.append(f"layer {index} has invalid type: {item['type']}")
+            item.setdefault("kind", str(item["type"]))
         if not isinstance(item["markers"], list) or not all(isinstance(m, str) for m in item["markers"]):
             errors.append(f"layer {index} markers must be an array of strings")
         try:
