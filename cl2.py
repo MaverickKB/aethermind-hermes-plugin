@@ -218,6 +218,7 @@ def _scope_match(layer: dict[str, Any], ctx_now: str, task_hint: str) -> tuple[f
     ctx = str(layer.get("ctx", ""))
     scope = str(layer.get("scope", "") or "repo")
     haystack = f"{ctx_now} {task_hint}".lower()
+    task_words = set(re.findall(r"[a-z0-9_-]{4,}", haystack))
     if ctx and (ctx.lower() in haystack or (haystack.strip() and haystack.strip() in ctx.lower())):
         return 1.0, "scope exact"
     if scope.startswith("area:") and scope[5:].lower() in haystack:
@@ -226,10 +227,18 @@ def _scope_match(layer: dict[str, Any], ctx_now: str, task_hint: str) -> tuple[f
         return 0.7, "global scope"
     if scope == "host":
         return 0.5, "host scope"
-    words = set(re.findall(r"[a-z0-9_-]{4,}", ctx.lower()))
-    task_words = set(re.findall(r"[a-z0-9_-]{4,}", haystack))
-    if words and task_words and words & task_words:
-        return 0.85, "ctx lexical overlap"
+    ctx_words = set(re.findall(r"[a-z0-9_-]{4,}", ctx.lower()))
+    marker_words = set()
+    for marker in aem_store.string_list(layer.get("markers")):
+        marker_words.update(re.findall(r"[a-z0-9_-]{4,}", marker.lower()))
+    if task_words and (ctx_words | marker_words) & task_words:
+        return 0.9, "ctx/marker lexical overlap"
+    body_words = set(re.findall(r"[a-z0-9_-]{4,}", str(layer.get("body", "")).lower()))
+    body_overlap = body_words & task_words
+    if task_words and len(body_overlap) >= 2:
+        return 0.65, "body lexical overlap"
+    if task_words:
+        return 0.25, "repo fallback weak match"
     return 0.8, "repo scope"
 
 
@@ -252,8 +261,16 @@ def riv_score(layer: dict[str, Any], superseded: set[str], ctx_now: str = "", ta
     if "~" in markers:
         pressure *= 0.8; why.append("tentative ~")
     severity = {"low": 0.8, "medium": 1.0, "high": 1.25}.get(str(layer.get("severity", "medium")).lower(), 1.0)
+    nutrition = str(layer.get("nutrition") or nutrition_verdict(layer, [])["verdict"])
+    nutrition_factor = 1.0
+    if nutrition in {"transcript", "memory_shaped"}:
+        nutrition_factor = 0.35
+        why.append(f"low-density {nutrition}")
+    elif nutrition == "questionable":
+        nutrition_factor = 0.75
+        why.append("questionable density")
     recurrence = len(aem_store.string_list(layer.get("recurrence_of")))
-    score = base * freshness * scope * pressure * severity * (1 + 0.25 * min(recurrence, 4))
+    score = base * freshness * scope * pressure * severity * nutrition_factor * (1 + 0.25 * min(recurrence, 4))
     why.extend(flags)
     return round(score, 4), why
 
@@ -273,7 +290,15 @@ def brief(project_root: str | Path, budget_tokens: int = 1200, task_hint: str = 
     scored.sort(key=lambda item: (-item[0], str(item[2].get("ctx", "")), str(item[2].get("id", ""))))
 
     floor_markers = {"?", ">"}
-    floor = [item for item in scored if floor_markers & set(aem_store.string_list(item[2].get("markers")))]
+    # Floor unresolved/handoff layers only when they still have meaningful task
+    # relevance after scoring. Otherwise a recent high-pressure incident in a
+    # different domain can drown the user's current mission.
+    floor = [
+        item for item in scored
+        if item[0] >= 0.45
+        and "repo fallback weak match" not in item[1]
+        and floor_markers & set(aem_store.string_list(item[2].get("markers")))
+    ]
     ordered = floor + [item for item in scored if item not in floor]
     included = []
     used = 0
