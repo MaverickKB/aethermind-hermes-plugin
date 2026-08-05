@@ -179,6 +179,15 @@ def _integrity_manifest_handler(args: dict[str, Any], **_kwargs: Any) -> str:
 # bundled reader only when the canonical core is absent.
 
 def _canonical_core() -> Any | None:
+    """Resolve the canonical core by file path, never by bare package name.
+
+    The plugin package itself is named ``aethermind``, so ``from aethermind
+    import AetherMind`` would resolve to THIS plugin and return None. Load the
+    canonical core from its resolved ``core.py`` under a unique module name so
+    the read-contract handlers share the SAME code as the running MCP.
+    """
+    import importlib.util
+
     candidates = [
         os.environ.get("AETHERMIND_LIB"),
         "/Users/kbandoly/Programming/AetherMind/lib",
@@ -188,13 +197,23 @@ def _canonical_core() -> Any | None:
         if not candidate:
             continue
         path = Path(candidate).expanduser()
-        if (path / "aethermind").is_dir() and str(path) not in sys.path:
-            sys.path.insert(0, str(path))
-    try:
-        from aethermind import AetherMind  # type: ignore
-        return AetherMind
-    except Exception:
-        return None
+        core_path = path / "aethermind" / "core.py"
+        if not core_path.exists():
+            continue
+        module_name = f"_aethermind_canonical_core_{abs(hash(str(core_path)))}"
+        if module_name in sys.modules:
+            return sys.modules[module_name].AetherMind
+        try:
+            spec = importlib.util.spec_from_file_location(module_name, core_path)
+            if spec is None or spec.loader is None:
+                continue
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
+            return getattr(module, "AetherMind", None)
+        except Exception:
+            return None
+    return None
 
 
 def _layer_dict(layer: Any) -> dict[str, Any]:
