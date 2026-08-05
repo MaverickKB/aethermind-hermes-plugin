@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -168,6 +169,107 @@ def _import_layers_handler(args: dict[str, Any], **_kwargs: Any) -> str:
 
 def _integrity_manifest_handler(args: dict[str, Any], **_kwargs: Any) -> str:
     return _json(aem_store.integrity_manifest(str(args["project_root"])))
+
+
+# --- Anchor-scoped deterministic read contract (added 2026-08-05) ---
+# The live local deployment now uses the deterministic anchor-scoped brief,
+# hash-chain audit, and gate contract. When the canonical core is available on
+# this host (Programming/AetherMind/lib), these handlers route through it so
+# every running surface shares the SAME read contract. Fall back to the
+# bundled reader only when the canonical core is absent.
+
+def _canonical_core() -> Any | None:
+    candidates = [
+        os.environ.get("AETHERMIND_LIB"),
+        "/Users/kbandoly/Programming/AetherMind/lib",
+        "/home/master/Programming/AetherMind/lib",
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate).expanduser()
+        if (path / "aethermind").is_dir() and str(path) not in sys.path:
+            sys.path.insert(0, str(path))
+    try:
+        from aethermind import AetherMind  # type: ignore
+        return AetherMind
+    except Exception:
+        return None
+
+
+def _layer_dict(layer: Any) -> dict[str, Any]:
+    return {
+        "id": getattr(layer, "id", None),
+        "ts": getattr(layer, "ts", None),
+        "type": getattr(layer, "type", None),
+        "ctx": getattr(layer, "ctx", None),
+        "body": getattr(layer, "body", None),
+        "conf": getattr(layer, "conf", None),
+        "markers": list(getattr(layer, "markers", []) or []),
+        "corrects": list(getattr(layer, "corrects", []) or []),
+        "prev_hash": getattr(layer, "prev_hash", None),
+    }
+
+
+def _brief_anchor_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    root = str(args["project_root"])
+    anchor = str(args.get("anchor") or "")
+    budget = int(args.get("budget") or 4000)
+    core = _canonical_core()
+    if core is not None:
+        try:
+            aether = core(root, create=False)
+            brief = aether.brief_anchor(anchor=anchor or None, budget=budget)
+            return _json({
+                "source": "canonical-core",
+                "anchor": brief["anchor"],
+                "must_know": brief["must_know"],
+                "unabsorbed_debt": brief["unabsorbed_debt"],
+                "kept": [_layer_dict(layer) for layer in brief["kept"]],
+                "tombstones": brief["tombstones"],
+                "budget": brief["budget"],
+                "budget_used": brief["budget_used"],
+                "layer_count": brief["layer_count"],
+                "determinism_key": brief["determinism_key"],
+            })
+        except Exception as exc:
+            return _json({"source": "canonical-core", "error": f"{type(exc).__name__}: {exc}"})
+    # Fallback: bundled reader query filtered by anchor.
+    layers = aem_store.query_layers(root, ctx_prefix=anchor, limit=budget)
+    return _json({"source": "bundled-fallback", "kept": layers, "tombstones": []})
+
+
+def _audit_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    root = str(args["project_root"])
+    core = _canonical_core()
+    if core is not None:
+        try:
+            aether = core(root, create=False)
+            return _json({"source": "canonical-core", **aether.audit()})
+        except Exception as exc:
+            return _json({"source": "canonical-core", "error": f"{type(exc).__name__}: {exc}"})
+    manifest = aem_store.integrity_manifest(root)
+    return _json({"source": "bundled-fallback", "manifest": manifest})
+
+
+def _gate_check_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    root = str(args["project_root"])
+    anchor = str(args.get("anchor") or "")
+    enforce = bool(args.get("enforce_gate") or False)
+    core = _canonical_core()
+    if core is not None:
+        try:
+            aether = core(root, create=False)
+            plan = {
+                "anchor": anchor or None,
+                "planned_type": str(args.get("planned_type") or "layer"),
+                "planned_ctx": str(args.get("planned_ctx") or ""),
+                "enforce_gate": enforce,
+            }
+            return _json({"source": "canonical-core", **aether.gate_check(plan, anchor=anchor or None)})
+        except Exception as exc:
+            return _json({"source": "canonical-core", "error": f"{type(exc).__name__}: {exc}"})
+    return _json({"source": "bundled-fallback", "verdict": "advisory", "must_know": []})
 
 
 def _hook_project_root(kwargs: dict[str, Any]) -> Path:
@@ -443,6 +545,40 @@ TOOL_SPECS = [
         "Return SHA-256 hashes and layer IDs for an AetherMind store.",
         _object_schema(PROJECT_ROOT, ["project_root"]),
         _integrity_manifest_handler,
+    ),
+    (
+        "aethermind_brief_anchor",
+        "Read contract: anchor-scoped deterministic brief with must-know corrections, unabsorbed debt, tombstones, and a determinism key. Same ledger + same budget = byte-identical output.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "anchor": {"type": "string"},
+                "budget": {"type": "integer", "default": 4000},
+            },
+            ["project_root"],
+        ),
+        _brief_anchor_handler,
+    ),
+    (
+        "aethermind_audit",
+        "Read contract: scan the ledger hash chain and report integrity (chain breaks, legacy prefix, chain start).",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _audit_handler,
+    ),
+    (
+        "aethermind_gate_check",
+        "Read contract: check a proposed mutation against must-know corrections. Advisory by default; enforce_gate=true rejects when unabsorbed corrections block.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "anchor": {"type": "string"},
+                "planned_type": {"type": "string", "default": "layer"},
+                "planned_ctx": {"type": "string"},
+                "enforce_gate": {"type": "boolean", "default": False},
+            },
+            ["project_root"],
+        ),
+        _gate_check_handler,
     ),
 ]
 
