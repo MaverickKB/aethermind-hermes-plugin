@@ -11,7 +11,7 @@ else
   PY="python3"
 fi
 
-"$PY" -m py_compile __init__.py aem_store.py
+"$PY" -m py_compile __init__.py aem_store.py aethermind_core.py
 
 "$PY" - <<'PY'
 from __future__ import annotations
@@ -30,6 +30,7 @@ required = {
     "README.md",
     "__init__.py",
     "aem_store.py",
+    "aethermind_core.py",
     "plugin.yaml",
     "docs/AEM_FORMAT.md",
     "docs/HERMES_PLUGIN.md",
@@ -101,6 +102,15 @@ expected_tools = {
     "aethermind_export_store",
     "aethermind_import_layers",
     "aethermind_integrity_manifest",
+    "aethermind_capabilities",
+    "aethermind_currentness",
+    "aethermind_brief",
+    "aethermind_brief_anchor",
+    "aethermind_audit",
+    "aethermind_gate_check",
+    "aethermind_write_event",
+    "aethermind_read_events",
+    "aethermind_archive",
 }
 if set(ctx.tools) != expected_tools:
     raise SystemExit(f"unexpected tools: {sorted(ctx.tools)}")
@@ -144,8 +154,42 @@ with tempfile.TemporaryDirectory(prefix="aethermind-plugin-smoke-") as tmp:
     imported_report = json.loads(
         ctx.tools["aethermind_evaluate_store"]["handler"]({"project_root": str(imported_project)})
     )
+    capabilities = json.loads(
+        ctx.tools["aethermind_capabilities"]["handler"]({"project_root": str(project)})
+    )
+    currentness = json.loads(
+        ctx.tools["aethermind_currentness"]["handler"]({"project_root": str(project)})
+    )
+    event_project = Path(tmp) / "event-project"
+    event = json.loads(
+        ctx.tools["aethermind_write_event"]["handler"](
+            {
+                "project_root": str(event_project),
+                "type": "observation",
+                "body": "Plugin method smoke.",
+                "ctx": "smoke/event",
+            }
+        )
+    )
+    events = json.loads(
+        ctx.tools["aethermind_read_events"]["handler"](
+            {"project_root": str(event_project)}
+        )
+    )
 
-if not (init["ok"] and write["ok"] and texture["ok"] and report["valid"] and imported["ok"] and imported_report["valid"]):
+if not (
+    init["ok"]
+    and write["ok"]
+    and texture["ok"]
+    and report["valid"]
+    and report["continuity_properties"]["durability"]
+    and imported["ok"]
+    and imported_report["valid"]
+    and capabilities["runtime_version"] == "0.2.0"
+    and len(currentness["active_heads"]) == 1
+    and event["event_id"] == "0001"
+    and len(events["events"]) == 1
+):
     raise SystemExit("plugin smoke failed")
 
 with tempfile.TemporaryDirectory(prefix="aethermind-plugin-hooks-") as tmp:

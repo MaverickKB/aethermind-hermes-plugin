@@ -24,6 +24,11 @@ same project.
 - `aethermind_write_layer` appends a structured continuity layer.
 - `aethermind_read_layers` searches stored layers.
 - `aethermind_reorient` builds a task-relevant continuity bundle.
+- `aethermind_currentness` separates active heads from inactive lineage.
+- `aethermind_brief` and `aethermind_brief_anchor` return compact current state.
+- `aethermind_write_event` keeps routine observations in `events.aem`.
+- `aethermind_archive` copies selected records to `archive.aem` and appends
+  their tombstone to `layers.aem`.
 - `aethermind_evaluate_store` validates schema, privacy, density, and continuity
   properties.
 
@@ -39,3 +44,7 @@ Use layer types intentionally:
 - `fork` for alternate paths or abandoned branches.
 
 Keep each layer short enough to scan quickly.
+
+Use `primitive = "artifact-reference"`, `anchor`, `pressure-event`,
+`supersession`, or `rollback` only when the corresponding relationship is part
+of the continuity being recorded. Otherwise use the base `layer` primitive.

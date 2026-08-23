@@ -1,33 +1,23 @@
 # Scope
 
-AetherMind is a compact, append-only continuity substrate for local projects. It
-preserves the small pieces of working judgment that a future agent session needs
-before touching the same project again.
+The AetherMind Hermes plugin exposes the project-local continuity primitive
+through Hermes tools and lifecycle hooks.
 
-## In Scope
+## Included
 
-- Creating `.aethermind/layers.aem` and `.aethermind/texture.aem`.
-- Appending structured continuity layers.
-- Reading and searching project-local layers.
-- Writing and reading short texture entries.
-- Building a task-relevant reorientation bundle.
-- Evaluating store schema, density, privacy, and retrieval signals.
-- Exporting, importing, and hashing `.aem` stores.
-- Registering those behaviors as Hermes tools.
-- Automatically initializing and reading the project-local store through Hermes
-  lifecycle hooks.
-- Injecting compact continuity guidance before model calls so AetherMind use is
-  part of the normal session flow.
+- project-local `layers.aem`, `texture.aem`, `events.aem`, and
+  `archive.aem`;
+- all six Light v1 primitives and their relationships;
+- filtered reads, task reorientation, currentness, briefs, events, and archive
+  methods;
+- export and import of AEM text;
+- Hermes tool, hook, and companion-skill registration;
+- compatibility with the 0.1 tool names and AEM records.
 
-## Out Of Scope
+## Boundary
 
-- Transcript storage.
-- Generic long-term memory.
-- Task ledgers or status logs.
-- Customer-data storage.
-- Deployment orchestration.
-- Benchmark or review packets.
+The plugin does not replace transcripts, task tracking, general memory, search,
+deployment orchestration, or harness policy. It operates only on the project
+root supplied by Hermes or by the tool caller.
 
-Integrators own their UI, routing, policy, and deployment identity. The plugin
-provides local continuity tools and Hermes lifecycle enforcement for those
-tools.
+Integrators own their interface, routing, deployment, and data-sharing choices.
