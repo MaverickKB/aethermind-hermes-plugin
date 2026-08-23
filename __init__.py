@@ -23,6 +23,19 @@ def _init_store_handler(args: dict[str, Any], **_kwargs: Any) -> str:
 
 
 def _write_layer_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    optional_fields = {
+        key: args[key]
+        for key in (
+            "thread_key", "supersedes", "rollback_of", "corrects",
+            "recurrence_of", "next", "artifact", "artifact_ref", "anchor", "ref",
+            "kind", "label", "host", "repo_root", "content_id", "selector",
+            "span_hint", "domain", "symptom", "next_verification",
+            "suspected_mechanism", "scope", "severity", "owner_hint",
+            "repair", "reason", "replacement", "restored_to", "inline",
+            "remote_target", "local_store_reason", "source_tool", "store_kind",
+        )
+        if key in args and args[key] is not None
+    }
     return _json(
         aem_store.write_layer(
             str(args["project_root"]),
@@ -30,10 +43,12 @@ def _write_layer_handler(args: dict[str, Any], **_kwargs: Any) -> str:
             body=str(args["body"]),
             ctx=str(args["ctx"]),
             author=str(args.get("author") or "hermes-aethermind-plugin"),
-            conf=float(args.get("conf") or 1.0),
+            conf=args.get("conf", 1.0),
             markers=args.get("markers"),
             evidence=args.get("evidence"),
             verification=args.get("verification"),
+            primitive=str(args.get("primitive") or "layer"),
+            **optional_fields,
         )
     )
 
@@ -48,6 +63,9 @@ def _read_layers_handler(args: dict[str, Any], **_kwargs: Any) -> str:
             author=str(args.get("author") or ""),
             text=str(args.get("text") or ""),
             limit=int(args.get("limit") or 20),
+            since_ts=str(args.get("since_ts") or ""),
+            last_n=int(args["last_n"]) if args.get("last_n") is not None else None,
+            markers_any=args.get("markers_any"),
         )
     )
 
@@ -59,6 +77,7 @@ def _write_texture_handler(args: dict[str, Any], **_kwargs: Any) -> str:
             body=str(args["body"]),
             ctx=str(args.get("ctx") or ""),
             marker=str(args.get("marker") or ""),
+            author=str(args.get("author") or "hermes-aethermind-plugin"),
         )
     )
 
@@ -98,6 +117,80 @@ def _import_layers_handler(args: dict[str, Any], **_kwargs: Any) -> str:
 
 def _integrity_manifest_handler(args: dict[str, Any], **_kwargs: Any) -> str:
     return _json(aem_store.integrity_manifest(str(args["project_root"])))
+
+
+def _capabilities_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(aem_store.runtime_capabilities(str(args["project_root"])))
+
+
+def _currentness_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(
+        aem_store.currentness(
+            str(args["project_root"]), as_of=args.get("as_of")
+        )
+    )
+
+
+def _brief_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(
+        aem_store.brief(str(args["project_root"]), as_of=args.get("as_of"))
+    )
+
+
+def _brief_anchor_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(
+        aem_store.brief_anchor(
+            str(args["project_root"]),
+            anchor=args.get("anchor"),
+            budget=(
+                int(args["budget"])
+                if args.get("budget") is not None
+                else 4000
+            ),
+            as_of=args.get("as_of"),
+        )
+    )
+
+
+def _audit_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(aem_store.audit(str(args["project_root"])))
+
+
+def _gate_check_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    plan = dict(args.get("plan") or {})
+    return _json(
+        aem_store.gate_check(
+            str(args["project_root"]),
+            plan=plan,
+            anchor=args.get("anchor"),
+        )
+    )
+
+
+def _write_event_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(
+        aem_store.write_event(
+            str(args["project_root"]),
+            event_type=str(args["type"]),
+            body=str(args["body"]),
+            ctx=str(args["ctx"]),
+            author=str(args.get("author") or "hermes-aethermind-plugin"),
+        )
+    )
+
+
+def _read_events_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(aem_store.read_events(str(args["project_root"])))
+
+
+def _archive_handler(args: dict[str, Any], **_kwargs: Any) -> str:
+    return _json(
+        aem_store.archive(
+            str(args["project_root"]),
+            layer_ids=[str(value) for value in args["layer_ids"]],
+            reason=str(args.get("reason") or ""),
+        )
+    )
 
 
 def _hook_project_root(kwargs: dict[str, Any]) -> Path:
@@ -192,6 +285,43 @@ TOOL_SPECS = [
                 "markers": TEXT_ARRAY,
                 "evidence": TEXT_ARRAY,
                 "verification": TEXT_ARRAY,
+                "next": TEXT_ARRAY,
+                "primitive": {
+                    "type": "string",
+                    "enum": sorted(aem_store.ALLOWED_LIGHT_PRIMITIVES),
+                },
+                "thread_key": {"type": "string"},
+                "supersedes": TEXT_ARRAY,
+                "rollback_of": TEXT_ARRAY,
+                "corrects": TEXT_ARRAY,
+                "recurrence_of": TEXT_ARRAY,
+                "artifact": {"type": "string"},
+                "artifact_ref": {"type": "string"},
+                "anchor": {"type": "string"},
+                "ref": {"type": "string"},
+                "kind": {"type": "string"},
+                "label": {"type": "string"},
+                "host": {"type": "string"},
+                "repo_root": {"type": "string"},
+                "content_id": {"type": "string"},
+                "selector": {"type": "string"},
+                "span_hint": {"type": "string"},
+                "domain": {"type": "string"},
+                "symptom": {"type": "string"},
+                "next_verification": {"type": "string"},
+                "suspected_mechanism": {"type": "string"},
+                "scope": {"type": "string"},
+                "severity": {"type": "string"},
+                "owner_hint": {"type": "string"},
+                "repair": {"type": "string"},
+                "reason": {"type": "string"},
+                "replacement": {"type": "string"},
+                "restored_to": {"type": "string"},
+                "remote_target": {"type": "string"},
+                "local_store_reason": {"type": "string"},
+                "source_tool": {"type": "string"},
+                "store_kind": {"type": "string"},
+                "inline": {"type": "boolean"},
             },
             ["project_root", "type", "body", "ctx"],
         ),
@@ -209,6 +339,9 @@ TOOL_SPECS = [
                 "author": {"type": "string"},
                 "text": {"type": "string"},
                 "limit": {"type": "integer", "default": 20},
+                "since_ts": {"type": "string"},
+                "last_n": {"type": "integer"},
+                "markers_any": TEXT_ARRAY,
             },
             ["project_root"],
         ),
@@ -223,6 +356,7 @@ TOOL_SPECS = [
                 "body": {"type": "string"},
                 "ctx": {"type": "string"},
                 "marker": {"type": "string"},
+                "author": {"type": "string"},
             },
             ["project_root", "body"],
         ),
@@ -255,7 +389,7 @@ TOOL_SPECS = [
     ),
     (
         "aethermind_export_store",
-        "Export an AetherMind store as JSON.",
+        "Export the AEM store contents through the tool response.",
         _object_schema(PROJECT_ROOT, ["project_root"]),
         _export_store_handler,
     ),
@@ -278,6 +412,95 @@ TOOL_SPECS = [
         "Return SHA-256 hashes and layer IDs for an AetherMind store.",
         _object_schema(PROJECT_ROOT, ["project_root"]),
         _integrity_manifest_handler,
+    ),
+    (
+        "aethermind_capabilities",
+        "Return the AetherMind runtime identity, format, and methods.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _capabilities_handler,
+    ),
+    (
+        "aethermind_currentness",
+        "Return active heads and inactive lineage without rewriting history.",
+        _object_schema(
+            {**PROJECT_ROOT, "as_of": {"type": "string"}}, ["project_root"]
+        ),
+        _currentness_handler,
+    ),
+    (
+        "aethermind_brief",
+        "Return the current scoped continuity brief.",
+        _object_schema(
+            {**PROJECT_ROOT, "as_of": {"type": "string"}}, ["project_root"]
+        ),
+        _brief_handler,
+    ),
+    (
+        "aethermind_brief_anchor",
+        "Return a deterministic anchor-scoped continuity brief.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "anchor": {"type": "string"},
+                "budget": {"type": "integer", "minimum": 0, "default": 4000},
+                "as_of": {"type": "string"},
+            },
+            ["project_root"],
+        ),
+        _brief_anchor_handler,
+    ),
+    (
+        "aethermind_audit",
+        "Report the layer ledger chain and parse state.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _audit_handler,
+    ),
+    (
+        "aethermind_gate_check",
+        "Check a proposed plan against current correction layers.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "plan": {"type": "object"},
+                "anchor": {"type": "string"},
+            },
+            ["project_root", "plan"],
+        ),
+        _gate_check_handler,
+    ),
+    (
+        "aethermind_write_event",
+        "Append a routine observation to events.aem.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "type": {"type": "string"},
+                "body": {"type": "string"},
+                "ctx": {"type": "string"},
+                "author": {"type": "string"},
+            },
+            ["project_root", "type", "body", "ctx"],
+        ),
+        _write_event_handler,
+    ),
+    (
+        "aethermind_read_events",
+        "Read routine observations from events.aem.",
+        _object_schema(PROJECT_ROOT, ["project_root"]),
+        _read_events_handler,
+    ),
+    (
+        "aethermind_archive",
+        "Copy selected layers to archive.aem and append a tombstone to layers.aem.",
+        _object_schema(
+            {
+                **PROJECT_ROOT,
+                "layer_ids": TEXT_ARRAY,
+                "reason": {"type": "string"},
+            },
+            ["project_root", "layer_ids"],
+        ),
+        _archive_handler,
     ),
 ]
 

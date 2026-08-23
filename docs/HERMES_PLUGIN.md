@@ -1,17 +1,12 @@
 # Hermes Plugin
 
-This repository is laid out as a direct Hermes directory plugin. Hermes installs
-Git plugins into its plugin directory and loads a plugin when the installed
-directory contains:
+This repository is a direct Hermes directory plugin. Hermes loads the plugin
+from `plugin.yaml` and `__init__.py`.
 
-```text
-plugin.yaml
-__init__.py
-```
-
-`plugin.yaml` declares the plugin metadata and tool names. `__init__.py`
-implements `register(ctx)` and registers the AetherMind tools, lifecycle hooks,
-and companion skill.
+`aethermind_core.py` contains the same project-local continuity engine shipped
+by the public primitive. `aem_store.py` adapts that engine to the Hermes tool
+contract. The plugin remains self-contained and has no external service
+dependency.
 
 ## Install
 
@@ -23,49 +18,66 @@ hermes plugins list
 Restart Hermes after enabling. In a running session, `/plugins` should list
 `aethermind`.
 
-## Automatic Continuity Hooks
+## Project root
 
-The plugin registers two Hermes lifecycle hooks:
+The working directory is the default project root. Set
+`AETHERMIND_PROJECT_ROOT` to select another root for lifecycle hooks. Every
+explicit tool call also requires `project_root`.
 
-- `on_session_start` initializes `.aethermind/layers.aem` and
-  `.aethermind/texture.aem` for the current project root.
-- `pre_llm_call` reads task-relevant layers and injects a compact AetherMind
-  continuity block into the current user turn.
+The store always belongs beside the project filesystem being described.
 
-By default, the project root is the Hermes process working directory. Set
-`AETHERMIND_PROJECT_ROOT` to force a specific root.
+## Lifecycle hooks
 
-The injected context tells the agent to use `aethermind_write_layer` when work
-produces a durable decision, correction, discovery, friction, or uncertainty.
-The plugin does not write synthetic task-summary layers automatically.
+- `on_session_start` explicitly initializes the project-local AEM store.
+- `pre_llm_call` retrieves task-relevant layers and adds a compact continuity
+  block to the current turn.
 
-The companion skill is plugin-qualified as
-`aethermind:aethermind-continuity`. It is available through `skill_view`, not as
-a copied `~/.hermes/skills` entry.
+The hook tells the agent which project root to use. It does not create synthetic
+task-summary layers.
 
-## Discovery Debugging
+## Tool groups
 
-```bash
-HERMES_PLUGINS_DEBUG=1 hermes plugins list
-hermes logs --level WARNING | grep -i plugin
-```
-
-The plugin has no external service dependency. Each tool operates on the project
-path supplied in the tool arguments.
-
-For hook behavior, run Hermes from a clean project directory and check that
-`.aethermind/layers.aem` and `.aethermind/texture.aem` are created after a fresh
-session starts.
-
-## Registered Tools
+Write and read:
 
 - `aethermind_init_store`
 - `aethermind_write_layer`
 - `aethermind_read_layers`
 - `aethermind_write_texture`
 - `aethermind_read_texture`
+- `aethermind_write_event`
+- `aethermind_read_events`
+- `aethermind_archive`
+
+Orientation:
+
 - `aethermind_reorient`
+- `aethermind_currentness`
+- `aethermind_brief`
+- `aethermind_brief_anchor`
+- `aethermind_gate_check`
+
+Inspection and transfer:
+
+- `aethermind_capabilities`
+- `aethermind_audit`
 - `aethermind_evaluate_store`
+- `aethermind_integrity_manifest`
 - `aethermind_export_store`
 - `aethermind_import_layers`
-- `aethermind_integrity_manifest`
+
+## Discovery checks
+
+```bash
+HERMES_PLUGINS_DEBUG=1 hermes plugins list
+hermes logs --level WARNING | grep -i plugin
+```
+
+For hook behavior, start Hermes from a clean project directory and confirm that
+`.aethermind/layers.aem` and `.aethermind/texture.aem` appear after a fresh
+session starts.
+
+## Upgrade behavior
+
+The 0.2 plugin reads the existing 0.1 AEM records directly. It does not rename or
+rewrite the store during installation. See [UPGRADING.md](UPGRADING.md) for the
+preservation and rollback path.
