@@ -250,13 +250,30 @@ try:
 except ImportError:  # pragma: no cover - Windows or unsupported host
     fcntl = None  # type: ignore[assignment]
 
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - POSIX or unsupported host
+    msvcrt = None  # type: ignore[assignment]
+
 
 def _lock_backend() -> str:
-    return "fcntl" if fcntl is not None else "unavailable"
+    if fcntl is not None:
+        return "fcntl"
+    if msvcrt is not None:
+        return "msvcrt"
+    return "unavailable"
+
+
+def _locking_scope() -> str:
+    if fcntl is not None:
+        return "local-posix-advisory"
+    if msvcrt is not None:
+        return "local-windows-byte-range"
+    return "unavailable"
 
 
 def _require_lock_backend() -> None:
-    if fcntl is None:
+    if _lock_backend() == "unavailable":
         raise LockUnavailableError(
             "no safe local file locking backend is available; refusing to write"
         )
@@ -265,16 +282,55 @@ def _require_lock_backend() -> None:
 class _FileLock:
     def __init__(self, file_obj):
         self.file_obj = file_obj
+        self._windows_lock_file = None
+
+    def _windows_lock_path(self) -> Path:
+        path = Path(self.file_obj.name)
+        return path.with_name(f"{path.name}.lock")
+
+    def _lock_with_msvcrt(self) -> None:
+        """Lock a dedicated byte so ledger data files remain readable on Windows.
+
+        ``msvcrt.locking`` operates on byte ranges. Locking a sibling file keeps
+        the data ledger free of mandatory byte-range locks while serializing all
+        cooperating AetherMind writers for that ledger.
+        """
+        assert msvcrt is not None
+        lock_file = self._windows_lock_path().open("a+b")
+        self._windows_lock_file = lock_file
+        try:
+            lock_file.seek(0, io.SEEK_END)
+            if lock_file.tell() == 0:
+                lock_file.write(b"\0")
+                lock_file.flush()
+                os.fsync(lock_file.fileno())
+            lock_file.seek(0)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+        except BaseException:
+            lock_file.close()
+            self._windows_lock_file = None
+            raise
 
     def __enter__(self):
         _require_lock_backend()
-        assert fcntl is not None
-        fcntl.flock(self.file_obj.fileno(), fcntl.LOCK_EX)
+        if fcntl is not None:
+            fcntl.flock(self.file_obj.fileno(), fcntl.LOCK_EX)
+        else:
+            self._lock_with_msvcrt()
         return self.file_obj
 
     def __exit__(self, _exc_type, _exc, _tb):
-        assert fcntl is not None
-        fcntl.flock(self.file_obj.fileno(), fcntl.LOCK_UN)
+        if fcntl is not None:
+            fcntl.flock(self.file_obj.fileno(), fcntl.LOCK_UN)
+            return
+        assert msvcrt is not None
+        assert self._windows_lock_file is not None
+        try:
+            self._windows_lock_file.seek(0)
+            msvcrt.locking(self._windows_lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        finally:
+            self._windows_lock_file.close()
+            self._windows_lock_file = None
 
 # --- Data Models ---
 
@@ -1830,7 +1886,7 @@ def runtime_capabilities(
         "implementation_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
         "safe_default_create": True,
         "lock_backend": _lock_backend(),
-        "locking_scope": "local-posix-advisory" if fcntl is not None else "unavailable",
+        "locking_scope": _locking_scope(),
         "capabilities": [
             "acknowledged-layer-append",
             "explicit-store-init",

@@ -99,6 +99,10 @@ The validation script compiles the plugin, loads the Hermes registration
 surface, exercises the original and 0.2 methods, checks lifecycle hooks, and
 checks the public distribution surface.
 
+GitHub Actions runs this same validation on current Ubuntu and Windows runners.
+The matrix protects the POSIX `fcntl` backend used on macOS and Linux and the
+Windows `msvcrt` backend used by the installed Hermes plugin.
+
 ## Documentation
 
 - [Hermes plugin operation](docs/HERMES_PLUGIN.md)

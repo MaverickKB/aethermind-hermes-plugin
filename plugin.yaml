@@ -1,6 +1,9 @@
 name: aethermind
 version: 0.2.0
 description: Project-local continuity layers for Hermes agents.
+provides_hooks:
+  - on_session_start
+  - pre_llm_call
 provides_tools:
   - aethermind_init_store
   - aethermind_write_layer

@@ -53,7 +53,14 @@ for forbidden in ("src", "tests", "tools", "plugins", "pyproject.toml"):
         raise SystemExit(f"forbidden publish surface still present: {forbidden}")
 
 manifest = (root / "plugin.yaml").read_text(encoding="utf-8")
-for expected in ("name: aethermind", "aethermind_write_layer", "aethermind_reorient"):
+for expected in (
+    "name: aethermind",
+    "aethermind_write_layer",
+    "aethermind_reorient",
+    "provides_hooks:",
+    "on_session_start",
+    "pre_llm_call",
+):
     if expected not in manifest:
         raise SystemExit(f"plugin.yaml missing {expected!r}")
 
@@ -186,6 +193,8 @@ if not (
     and imported["ok"]
     and imported_report["valid"]
     and capabilities["runtime_version"] == "0.2.0"
+    and capabilities["lock_backend"] in {"fcntl", "msvcrt"}
+    and capabilities["locking_scope"] in {"local-posix-advisory", "local-windows-byte-range"}
     and len(currentness["active_heads"]) == 1
     and event["event_id"] == "0001"
     and len(events["events"]) == 1
