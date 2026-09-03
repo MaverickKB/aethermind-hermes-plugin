@@ -64,7 +64,7 @@ def _atomic_replace_text(path: Path, text: str) -> None:
     handle, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as temporary:
-            if path.exists():
+            if path.exists() and hasattr(os, "fchmod"):
                 os.fchmod(temporary.fileno(), path.stat().st_mode & 0o777)
             temporary.write(text)
             temporary.flush()
