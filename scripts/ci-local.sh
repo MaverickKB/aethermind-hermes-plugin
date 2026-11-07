@@ -31,7 +31,7 @@ PY
   fi
 fi
 
-"$PY" -m py_compile __init__.py aem_store.py cl2.py
+"$PY" -m py_compile __init__.py aem_store.py aethermind_core.py cl2.py
 
 "$PY" - <<'PY'
 from __future__ import annotations
@@ -51,6 +51,7 @@ required = {
     "__init__.py",
     "aem_store.py",
     "cl2.py",
+    "aethermind_core.py",
     "plugin.yaml",
     "docs/AEM_FORMAT.md",
     "docs/HERMES_PLUGIN.md",
@@ -73,7 +74,16 @@ for forbidden in ("src", "tests", "tools", "plugins", "pyproject.toml"):
         raise SystemExit(f"forbidden publish surface still present: {forbidden}")
 
 manifest = (root / "plugin.yaml").read_text(encoding="utf-8")
-for expected in ("name: aethermind", "aethermind_write_layer", "aethermind_reorient", "aethermind_cl2_brief", "aethermind_cl2_capsule"):
+for expected in (
+    "name: aethermind",
+    "aethermind_write_layer",
+    "aethermind_reorient",
+    "aethermind_cl2_brief",
+    "aethermind_cl2_capsule",
+    "provides_hooks:",
+    "on_session_start",
+    "pre_llm_call",
+):
     if expected not in manifest:
         raise SystemExit(f"plugin.yaml missing {expected!r}")
 
@@ -127,6 +137,15 @@ expected_tools = {
     "aethermind_export_store",
     "aethermind_import_layers",
     "aethermind_integrity_manifest",
+    "aethermind_capabilities",
+    "aethermind_currentness",
+    "aethermind_brief",
+    "aethermind_brief_anchor",
+    "aethermind_audit",
+    "aethermind_gate_check",
+    "aethermind_write_event",
+    "aethermind_read_events",
+    "aethermind_archive",
 }
 if set(ctx.tools) != expected_tools:
     raise SystemExit(f"unexpected tools: {sorted(ctx.tools)}")
@@ -201,8 +220,48 @@ with tempfile.TemporaryDirectory(prefix="aethermind-plugin-smoke-") as tmp:
     imported_report = json.loads(
         ctx.tools["aethermind_evaluate_store"]["handler"]({"project_root": str(imported_project)})
     )
+    capabilities = json.loads(
+        ctx.tools["aethermind_capabilities"]["handler"]({"project_root": str(project)})
+    )
+    currentness = json.loads(
+        ctx.tools["aethermind_currentness"]["handler"]({"project_root": str(project)})
+    )
+    event_project = Path(tmp) / "event-project"
+    event = json.loads(
+        ctx.tools["aethermind_write_event"]["handler"](
+            {
+                "project_root": str(event_project),
+                "type": "observation",
+                "body": "Plugin method smoke.",
+                "ctx": "smoke/event",
+            }
+        )
+    )
+    events = json.loads(
+        ctx.tools["aethermind_read_events"]["handler"](
+            {"project_root": str(event_project)}
+        )
+    )
 
-if not (init["ok"] and write["ok"] and cl2_capsule["ok"] and texture["ok"] and report["valid"] and imported["ok"] and imported_report["valid"]):
+if not (
+    init["ok"]
+    and write["ok"]
+    and cl2_capsule["ok"]
+    and texture["ok"]
+    and report["valid"]
+    and report["continuity_properties"]["durability"]
+    and imported["ok"]
+    and imported_report["valid"]
+    and capabilities["runtime_version"] == "0.2.0"
+    and capabilities["lock_backend"] in {"fcntl", "msvcrt"}
+    and capabilities["locking_scope"] in {"local-posix-advisory", "local-windows-byte-range"}
+    # The union smoke writes two independent lineage heads: the discovery
+    # layer (0001) and the CL2 boundary capsule (0002). Remote's original
+    # body wrote only the discovery layer, hence one head there.
+    and len(currentness["active_heads"]) == 2
+    and event["event_id"] == "0001"
+    and len(events["events"]) == 1
+):
     raise SystemExit("plugin smoke failed")
 
 with tempfile.TemporaryDirectory(prefix="aethermind-plugin-hooks-") as tmp:

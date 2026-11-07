@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-v0.1.0-rc.2}"
+VERSION="${1:-v0.2.0}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGING="${AETHERMIND_STAGING:-$(cd "$ROOT/.." && pwd)/aethermind-hermes-plugin-staging/drops}"
 NAME="aethermind-hermes-plugin-${VERSION#v}"
@@ -35,7 +35,7 @@ copy_path() {
   fi
 }
 
-for path in README.md LICENSE plugin.yaml __init__.py aem_store.py docs examples skills scripts/ci-local.sh; do
+for path in README.md CHANGELOG.md LICENSE plugin.yaml __init__.py aem_store.py aethermind_core.py docs examples skills scripts/ci-local.sh; do
   copy_path "$path"
 done
 
