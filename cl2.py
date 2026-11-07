@@ -52,12 +52,16 @@ POSTURE_PATTERNS = [
 ]
 
 
-def _layers_path(project_root: str | Path) -> Path:
+def _layers_path(project_root: str | Path) -> Path | None:
+    if aem_store.is_remote(project_root):
+        return None
     _root, layers_path, _texture = aem_store.project_paths(project_root)
     return layers_path
 
 
-def _sha256(path: Path) -> str | None:
+def _sha256(path: Path | None) -> str | None:
+    if path is None:
+        return None
     if not path.exists():
         return None
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -94,7 +98,39 @@ def _toml_value(value: Any) -> str:
     return json.dumps(str(value), ensure_ascii=False)
 
 
+REMOTE_LAYER_FIELDS = (
+    "layer_type", "body", "ctx", "conf", "markers", "author", "primitive",
+    "thread_key", "supersedes", "rollback_of", "corrects", "evidence",
+    "recurrence_of", "verification", "artifact", "artifact_ref", "anchor",
+    "ref", "kind", "label", "host", "repo_root", "content_id", "selector",
+    "span_hint", "domain", "symptom", "next_verification",
+    "suspected_mechanism", "scope", "severity", "owner_hint", "repair",
+    "reason", "replacement", "restored_to", "inline",
+)
+
+
 def _append_layer(project_root: str | Path, layer: dict[str, Any]) -> dict[str, Any]:
+    if aem_store.is_remote(project_root):
+        arguments = {}
+        for key in REMOTE_LAYER_FIELDS:
+            value = layer.get(key)
+            if value not in (None, "", []):
+                arguments[key] = value
+        # The remote tool expects the type under the name layer_type.
+        if "layer_type" not in arguments and layer.get("type") is not None:
+            arguments["layer_type"] = layer["type"]
+        arguments.pop("type", None)
+        result = aem_store.remote_call(project_root, "write_layer", arguments)
+        if not result.get("success"):
+            raise RuntimeError(f"remote write_layer failed: {result}")
+        stored = result.get("layer") or layer
+        return {
+            "ok": True,
+            "project_root": aem_store.remote_store_path(project_root),
+            "remote": True,
+            "layer": stored,
+            "layers_sha256": None,
+        }
     aem_store.init_store(project_root)
     path = _layers_path(project_root)
     ordered = ["id", "ts", "author", "type", "body", "ctx", "conf", "markers", "primitive"]
@@ -363,7 +399,8 @@ def write_layer(project_root: str | Path, *, layer_type: str, body: str, ctx: st
         raise ValueError("body is required")
     if not ctx:
         raise ValueError("ctx is required")
-    existing = aem_store.read_layers(project_root) if _layers_path(project_root).exists() else []
+    layers_path = _layers_path(project_root)
+    existing = aem_store.read_layers(project_root) if layers_path and layers_path.exists() else []
     marker_list = aem_store.string_list(markers)
     if layer_type == "boundary":
         layer_type = "load-bearing"

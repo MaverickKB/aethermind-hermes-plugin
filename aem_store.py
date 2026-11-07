@@ -32,6 +32,15 @@ PRESSURE_TYPES = {"friction", "correction", "uncertainty"}
 REQUIRED_FIELDS = {"id", "ts", "author", "type", "body", "ctx", "conf"}
 FORMAT_VERSION = "aethermind-aem-baseline-v1"
 
+# Remote canonical store. A project_root starting with "jarvis:" is routed
+# over HTTP to the Jarvis AetherMind MCP instead of the local filesystem,
+# so every host reads and writes the ONE tree (canonical store lives on
+# Jarvis; the Mac keeps no live store).
+REMOTE_PREFIX = "jarvis:"
+REMOTE_MCP_URL = os.environ.get(
+    "AETHERMIND_REMOTE_MCP", "http://100.82.24.28:8452/mcp"
+)
+
 PRIVATE_PATTERNS = [
     re.compile(r"/Users" + r"/[A-Za-z0-9_.-]+"),
     re.compile(r"/home" + r"/[A-Za-z0-9_.-]+"),
@@ -73,7 +82,86 @@ def project_paths(project_root: str | Path) -> tuple[Path, Path, Path]:
     return root, aem / "layers.aem", aem / "texture.aem"
 
 
+def is_remote(project_root: str | Path) -> bool:
+    return str(project_root).startswith(REMOTE_PREFIX)
+
+
+def remote_store_path(project_root: str | Path) -> str:
+    return str(project_root)[len(REMOTE_PREFIX):]
+
+
+def remote_call(project_root: str | Path, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Call one tool on the Jarvis AetherMind MCP and return its JSON result.
+
+    One-shot MCP session per call: initialize, notify, tools/call. Simple and
+    stateless; plugin traffic is a handful of calls per turn.
+    """
+    import urllib.request
+
+    def post(payload: dict[str, Any], session: str | None) -> tuple[dict[str, Any], str | None]:
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if session:
+            headers["Mcp-Session-Id"] = session
+        request = urllib.request.Request(
+            REMOTE_MCP_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=60) as response:
+            raw = response.read().decode("utf-8")
+            new_session = response.headers.get("Mcp-Session-Id") or session
+        text = raw.strip()
+        if not text:
+            # Notifications answer 202 with an empty body; that is success.
+            return None, new_session
+        if text.startswith("{"):
+            return json.loads(text), new_session
+        for line in text.splitlines():
+            # streamable-http may answer as SSE; take the first data line with JSON
+            if line.startswith("data:"):
+                candidate = line[len("data:"):].strip()
+                if candidate.startswith("{"):
+                    return json.loads(candidate), new_session
+        raise ValueError(f"unparsable MCP response for {tool}")
+
+    init_payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {"name": "aem-store-remote", "version": "1.0"},
+        },
+    }
+    _init_response, session = post(init_payload, None)
+    post({"jsonrpc": "2.0", "method": "notifications/initialized"}, session)
+    call_payload = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": tool,
+            "arguments": {**arguments, "project_root": remote_store_path(project_root)},
+        },
+    }
+    result, _session = post(call_payload, session)
+    if "error" in result:
+        raise RuntimeError(f"MCP {tool} error: {result['error']}")
+    content = result.get("result", {}).get("content", [])
+    if not content:
+        raise RuntimeError(f"MCP {tool} returned no content")
+    return json.loads(content[0]["text"])
+
+
 def init_store(project_root: str | Path) -> dict[str, Any]:
+    if is_remote(project_root):
+        # The canonical store already exists on Jarvis; nothing to create.
+        return {"ok": True, "project_root": remote_store_path(project_root), "remote": True}
     root, layers_path, texture_path = project_paths(project_root)
     layers_path.parent.mkdir(parents=True, exist_ok=True)
     layers_path.touch(exist_ok=True)
@@ -129,6 +217,11 @@ def validate_layers(layers: list[dict[str, Any]]) -> list[str]:
 
 
 def read_layers(project_root: str | Path) -> list[dict[str, Any]]:
+    if is_remote(project_root):
+        result = remote_call(project_root, "read_layers", {})
+        if not result.get("success"):
+            raise RuntimeError(f"remote read_layers failed: {result}")
+        return result.get("layers", [])
     _root, layers_path, _texture_path = project_paths(project_root)
     if not layers_path.exists() or not layers_path.read_text(encoding="utf-8").strip():
         return []
@@ -185,6 +278,36 @@ def write_layer(
         raise ValueError("ctx is required")
     if float(conf) < 0.0 or float(conf) > 1.0:
         raise ValueError("conf must be between 0 and 1")
+    if is_remote(project_root):
+        result = remote_call(project_root, "write_layer", {
+            "layer_type": layer_type,
+            "body": body,
+            "ctx": ctx,
+            "conf": float(conf),
+            "markers": string_list(markers),
+            "author": author,
+            "primitive": primitive,
+            "evidence": string_list(evidence),
+            "verification": string_list(verification),
+        })
+        if not result.get("success"):
+            raise RuntimeError(f"remote write_layer failed: {result}")
+        layer = result.get("layer") or {
+            "id": result.get("layer_id"),
+            "ts": result.get("ts"),
+            "author": author,
+            "type": layer_type,
+            "body": body,
+            "ctx": ctx,
+            "conf": float(conf),
+        }
+        return {
+            "ok": True,
+            "project_root": remote_store_path(project_root),
+            "remote": True,
+            "layer": layer,
+            "layers_sha256": None,
+        }
     init_store(project_root)
     root, layers_path, _texture_path = project_paths(project_root)
     layer = {
@@ -217,25 +340,77 @@ def query_layers(
     text: str = "",
     limit: int = 20,
 ) -> dict[str, Any]:
+    if is_remote(project_root):
+        arguments = {"last_n": int(limit)}
+        if ctx_prefix:
+            arguments["ctx_prefix"] = ctx_prefix
+        if layer_type:
+            arguments["type"] = layer_type
+        if marker:
+            arguments["markers_any"] = [marker]
+        if author:
+            arguments["author"] = author
+        if text:
+            arguments["text"] = text
+        result = remote_call(project_root, "read_layers", arguments)
+        if not result.get("success"):
+            raise RuntimeError(f"remote read_layers failed: {result}")
+        layers = result.get("layers", [])
+        return {
+            "count": len(layers),
+            "layers": layers,
+            "store": result.get("store"),
+            "remote": True,
+        }
+
+    _root, layers_path, _texture_path = project_paths(project_root)
+    if not layers_path.exists():
+        raise FileNotFoundError(
+            f"No AetherMind store at {layers_path}. A remote store needs the jarvis: prefix."
+        )
     layers = read_layers(project_root)
-    if ctx_prefix:
-        layers = [layer for layer in layers if str(layer["ctx"]).startswith(ctx_prefix)]
-    if layer_type:
-        layers = [layer for layer in layers if layer["type"] == layer_type]
-    if marker:
-        layers = [layer for layer in layers if marker in string_list(layer.get("markers"))]
-    if author:
-        layers = [layer for layer in layers if layer["author"] == author]
-    if text:
-        needle = text.lower()
-        layers = [layer for layer in layers if needle in str(layer["body"]).lower() or needle in str(layer["ctx"]).lower()]
-    layers = sorted(layers, key=lambda layer: str(layer["ts"]))[-int(limit) :]
-    return {"count": len(layers), "layers": layers}
+    needle = text.lower()
+    selected = []
+    for layer in layers:
+        if ctx_prefix and not str(layer["ctx"]).startswith(ctx_prefix):
+            continue
+        if layer_type and layer["type"] != layer_type:
+            continue
+        if marker and marker not in string_list(layer.get("markers")):
+            continue
+        if author and layer["author"] != author:
+            continue
+        if needle:
+            body_text = str(layer.get("body") or "")
+            context_text = str(layer.get("ctx") or "")
+            marker_hit = False
+            for item in string_list(layer.get("markers")):
+                if needle in item.lower():
+                    marker_hit = True
+                    break
+            body_hit = needle in body_text.lower()
+            context_hit = needle in context_text.lower()
+            if not body_hit and not context_hit and not marker_hit:
+                continue
+        selected.append(layer)
+    selected.sort(key=lambda layer: str(layer["ts"]))
+    if limit:
+        selected = selected[-int(limit):]
+    return {"count": len(selected), "layers": selected, "store": str(layers_path)}
 
 
 def write_texture(project_root: str | Path, *, body: str, ctx: str = "", marker: str = "") -> dict[str, Any]:
     if not body:
         raise ValueError("body is required")
+    if is_remote(project_root):
+        result = remote_call(project_root, "write_texture", {
+            "body": body,
+            "ctx": ctx,
+            "marker": marker or None,
+        })
+        if not result.get("success"):
+            raise RuntimeError(f"remote write_texture failed: {result}")
+        return {"ok": True, "entry": result.get("entry"), "texture_sha256": None, "remote": True}
     init_store(project_root)
     _root, _layers_path, texture_path = project_paths(project_root)
     entry = body
@@ -251,6 +426,17 @@ def write_texture(project_root: str | Path, *, body: str, ctx: str = "", marker:
 
 
 def read_texture(project_root: str | Path) -> dict[str, Any]:
+    if is_remote(project_root):
+        result = remote_call(project_root, "read_texture", {})
+        if isinstance(result, dict) and result.get("success") is False:
+            raise RuntimeError(f"remote read_texture failed: {result}")
+        if isinstance(result, dict):
+            return {
+                "texture": result.get("texture", ""),
+                "texture_sha256": result.get("texture_sha256"),
+                "remote": True,
+            }
+        return {"texture": str(result), "texture_sha256": None, "remote": True}
     _root, _layers_path, texture_path = project_paths(project_root)
     text = texture_path.read_text(encoding="utf-8") if texture_path.exists() else ""
     return {"texture": text, "texture_sha256": sha256_file(texture_path) if texture_path.exists() else None}
@@ -313,6 +499,8 @@ def density_warnings(layers: list[dict[str, Any]]) -> list[str]:
 
 
 def evaluate_store(project_root: str | Path) -> dict[str, Any]:
+    if is_remote(project_root):
+        raise ValueError("evaluate_store is not supported for remote roots; run it on the owning host")
     root, layers_path, texture_path = project_paths(project_root)
     errors: list[str] = []
     layers: list[dict[str, Any]] = []
@@ -364,6 +552,17 @@ def evaluate_store(project_root: str | Path) -> dict[str, Any]:
 
 
 def integrity_manifest(project_root: str | Path) -> dict[str, Any]:
+    if is_remote(project_root):
+        layers = read_layers(project_root)
+        return {
+            "project_root": remote_store_path(project_root),
+            "files": {},
+            "layer_count": len(layers),
+            "layer_ids": [str(layer["id"]) for layer in layers],
+            "created_by": "aethermind",
+            "format": FORMAT_VERSION,
+            "remote": True,
+        }
     root, layers_path, texture_path = project_paths(project_root)
     files: dict[str, Any] = {}
     for path in (layers_path, texture_path):
@@ -375,6 +574,8 @@ def integrity_manifest(project_root: str | Path) -> dict[str, Any]:
 
 
 def export_store(project_root: str | Path) -> dict[str, Any]:
+    if is_remote(project_root):
+        raise ValueError("export_store is not supported for remote roots; run it on the owning host")
     root, layers_path, texture_path = project_paths(project_root)
     return {
         "format": FORMAT_VERSION,
@@ -386,6 +587,8 @@ def export_store(project_root: str | Path) -> dict[str, Any]:
 
 
 def import_layers(project_root: str | Path, *, layers_aem: str, texture_aem: str = "", allow_existing: bool = False) -> dict[str, Any]:
+    if is_remote(project_root):
+        raise ValueError("import_layers is not supported for remote roots; run it on the owning host")
     root, layers_path, texture_path = project_paths(project_root)
     init_store(project_root)
     existing_layers_text = layers_path.read_text(encoding="utf-8")
