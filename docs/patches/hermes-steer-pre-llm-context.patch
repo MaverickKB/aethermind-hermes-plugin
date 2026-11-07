@@ -1,0 +1,52 @@
+diff --git a/agent/agent_runtime_helpers.py b/agent/agent_runtime_helpers.py
+index d628c1221af..38fda43c3c9 100644
+--- a/agent/agent_runtime_helpers.py
++++ b/agent/agent_runtime_helpers.py
+@@ -3704,6 +3704,47 @@ def apply_pending_steer_to_tool_results(agent, messages: list, num_tool_msgs: in
+         "Delivered /steer to agent after tool batch (%d chars) as new user message: %s", len(steer_text),
+         steer_text[:120] + ("..." if len(steer_text) > 120 else ""),
+     )
++    _attach_steer_hook_context(agent, messages)
++
++
++def _attach_steer_hook_context(agent, messages: list) -> None:
++    """Give a mid-run steered prompt the same ``pre_llm_call`` hook context a
++    turn-start prompt gets (AetherMind continuity packet, gateway notes, ...).
++
++    Turn starts collect plugin context in ``build_turn_context``; a steer is
++    admitted into an open run and never passes that gate, so without this the
++    model keeps working from the turn-start packet alone. The context rides
++    the steer row itself: a new row, not yet flushed, so no cached prompt
++    byte moves. Hook failures and vetoes are non-fatal here - a steer is
++    user text already accepted, so it is never dropped over hook context.
++    """
++    try:
++        from agent.turn_context import _collect_pre_llm_call_context
++
++        steer_row = messages[-1]
++        steer_text = str(steer_row.get("content") or "")
++        context = _collect_pre_llm_call_context(
++            agent,
++            effective_task_id=getattr(agent, "_current_task_id", "") or "",
++            turn_id=getattr(agent, "_current_turn_id", "") or "",
++            original_user_message=steer_text,
++            messages=messages,
++            conversation_history=list(messages),
++        )
++        if not context:
++            return
++        content = steer_row.get("content")
++        if isinstance(content, list):
++            # Multimodal steer rows take the context as a durable text part.
++            steer_row["content"] = [*content, {"type": "text", "text": context}]
++        else:
++            steer_row["content"] = f"{content or ''}\n\n{context}"
++        _ra().logger.info(
++            "Attached pre_llm_call hook context to steered prompt (%d chars)",
++            len(context),
++        )
++    except Exception:
++        _ra().logger.debug("steer hook context attach failed", exc_info=True)
+ 
+ 
+ def _shutdown_socket(sock: Any) -> None:
