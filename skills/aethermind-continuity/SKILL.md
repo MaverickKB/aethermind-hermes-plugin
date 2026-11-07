@@ -22,7 +22,7 @@ same project.
 - `aethermind_init_store` creates `.aethermind/layers.aem` and
   `.aethermind/texture.aem`.
 - `aethermind_write_layer` appends a structured v1 continuity layer.
-- `aethermind_read_layers` searches stored layers.
+- `aethermind_read_layers` searches body, context, and markers when `text` is set. A root that starts with `jarvis:` is the remote store. Any other root is a local file. A missing local file is an error, not an empty result.
 - `aethermind_reorient` builds the baseline task-relevant continuity bundle.
 - `aethermind_evaluate_store` validates schema, privacy, density, and continuity
   properties.

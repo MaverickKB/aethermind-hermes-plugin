@@ -291,14 +291,200 @@ def _gate_check_handler(args: dict[str, Any], **_kwargs: Any) -> str:
     return _json({"source": "bundled-fallback", "verdict": "advisory", "must_know": []})
 
 
-def _hook_project_root(kwargs: dict[str, Any]) -> Path:
+LAUNCH_DIRS = {"/Users/kbandoly", "/home/master"}
+REQUIRED_CLI_MCP = (
+    "aethermind",
+    "aethermind_jarvis",
+    "aethermind_atlas",
+    "cairn_world_state",
+    "ember-helmet",
+    "mesh",
+    "shared_context",
+    "wallclock",
+)
+
+
+def _is_launch_directory(root: Path) -> bool:
+    try:
+        resolved = str(root.expanduser().resolve())
+    except OSError:
+        return False
+    return resolved in LAUNCH_DIRS
+
+
+def _hermes_profile_config_path() -> Path:
+    hermes_home = os.environ.get("HERMES_HOME") or ""
+    if hermes_home:
+        return Path(hermes_home).expanduser() / "config.yaml"
+    return Path.home() / ".hermes" / "config.yaml"
+
+
+def _ensure_cli_continuity_mcp() -> None:
+    """Keep desktop/cli MCP allowlist from dropping continuity servers.
+
+    If platform_toolsets.cli names any MCP server, Hermes treats that list as
+    an allowlist and silently omits every other enabled MCP server. Hermes
+    updates and `hermes tools` saves freeze that list. Re-add the Cairn
+    continuity servers when they are missing. Do not rewrite the rest of
+    the file.
+    """
+    config_path = _hermes_profile_config_path()
+    if not config_path.is_file():
+        return
+    try:
+        original = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    lines = original.splitlines(keepends=True)
+    platform_index = None
+    for index, line in enumerate(lines):
+        if line.rstrip("\n") == "platform_toolsets:":
+            platform_index = index
+            break
+    if platform_index is None:
+        return
+    cli_index = None
+    scan = platform_index + 1
+    while scan < len(lines):
+        stripped = lines[scan].rstrip("\n")
+        if stripped and not stripped.startswith(" ") and not stripped.startswith("\t"):
+            break
+        if stripped == "  cli:":
+            cli_index = scan
+            break
+        scan += 1
+    if cli_index is None:
+        return
+    entry_start = cli_index + 1
+    entry_end = entry_start
+    present = []
+    while entry_end < len(lines):
+        stripped = lines[entry_end].rstrip("\n")
+        if stripped.startswith("    - "):
+            present.append(stripped[6:].strip())
+            entry_end += 1
+            continue
+        break
+    missing = []
+    for name in REQUIRED_CLI_MCP:
+        if name not in present:
+            missing.append(name)
+    if not missing:
+        return
+    insert_at = entry_end
+    new_lines = []
+    for name in missing:
+        new_lines.append(f"    - {name}\n")
+    updated = "".join(lines[:insert_at] + new_lines + lines[insert_at:])
+    backup_path = config_path.with_name(config_path.name + ".continuity-heal.bak")
+    try:
+        if not backup_path.exists():
+            backup_path.write_text(original, encoding="utf-8")
+        config_path.write_text(updated, encoding="utf-8")
+    except OSError:
+        return
+
+
+def _hook_project_root(kwargs: dict[str, Any]) -> Path | str:
     raw = (
         kwargs.get("project_root")
         or os.environ.get("AETHERMIND_PROJECT_ROOT")
         or os.environ.get("HERMES_PROJECT_ROOT")
         or os.getcwd()
     )
-    return Path(str(raw)).expanduser().resolve()
+    raw = str(raw)
+    if raw.startswith(aem_store.REMOTE_PREFIX):
+        return raw
+    resolved = Path(raw).expanduser().resolve()
+    # Desktop Hermes lives under ~/.hermes, and the hook payload stamps that
+    # process directory as cwd. The chat UI's home directory never arrives.
+    # Treat the Hermes install, and any directory inside it, as the user's home.
+    install = _hermes_profile_config_path().parent.resolve()
+    shared_home = Path.home() / ".hermes"
+    try:
+        shared_home = shared_home.resolve()
+    except OSError:
+        pass
+    if resolved == install or install in resolved.parents or resolved == shared_home or shared_home in resolved.parents:
+        # Home and the Hermes install are not project stores. Cairn continuity
+        # is the one Jarvis ledger, not a Mac directory beside the home folder.
+        return aem_store.REMOTE_PREFIX + "/home/master/.local/share/aethermind-cloud/projects/personal"
+    return resolved
+
+
+def _is_launch_root(root: Any) -> bool:
+    if not isinstance(root, Path):
+        # Remote canonical roots (jarvis:...) are never the launch directory.
+        return False
+    return _is_launch_directory(root)
+
+
+def _tree_brief_if_available(root: Path | str) -> str | None:
+    """Return the whole-store tree brief when the project has a summary tree.
+
+    The one-tree trunk (canonical store on Jarvis) renders through the Jarvis
+    MCP when the root is remote (jarvis:...). Local roots render from their
+    derived tree.aem through the canonical engine. Project stores without a
+    tree keep the legacy CL2 brief path so nothing else changes.
+    """
+    budget = int(os.environ.get("AETHERMIND_TREE_BUDGET", "3600") or "3600")
+    if aem_store.is_remote(root):
+        try:
+            payload = aem_store.remote_call(root, "view", {"budget_chars": budget})
+        except Exception:
+            return None
+        if not payload.get("success"):
+            return None
+        view = payload.get("view", "")
+        return (
+            f"{view}\n"
+            f"[tree brief: {payload.get('est_tokens')}/900 est. tokens, "
+            f"{payload.get('chars')} chars, deterministic from tree.aem]"
+        )
+    tree_path = root / ".aethermind" / "tree.aem"
+    if not tree_path.exists():
+        return None
+    budget = int(os.environ.get("AETHERMIND_TREE_BUDGET", "3600") or "3600")
+    lib_path = os.environ.get(
+        "AETHERMIND_LIB_PATH", "/Users/kbandoly/Programming/AetherMind/lib"
+    )
+    try:
+        if lib_path not in sys.path:
+            sys.path.insert(0, lib_path)
+        from aethermind.view import render_view, view_cost
+
+        text = render_view(str(root), budget_chars=budget)
+        cost = view_cost(text)
+        return (
+            f"{text}\n"
+            f"[tree brief: {cost['est_tokens']}/900 est. tokens, {cost['chars']} chars, "
+            f"deterministic from tree.aem]"
+        )
+    except Exception:
+        pass
+    try:
+        import subprocess
+
+        script = (
+            "import sys, json; sys.path.insert(0, %r); "
+            "from aethermind.view import render_view, view_cost; "
+            "text = render_view(%r, budget_chars=%d); "
+            "print(json.dumps({'text': text, **view_cost(text)}))"
+            % (lib_path, str(root), budget)
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, text=True, timeout=120
+        )
+        if result.returncode != 0:
+            return None
+        payload = json.loads(result.stdout.strip().splitlines()[-1])
+        return (
+            f"{payload['text']}\n"
+            f"[tree brief: {payload['est_tokens']}/900 est. tokens, {payload['chars']} chars, "
+            f"deterministic from tree.aem]"
+        )
+    except Exception:
+        return None
 
 
 def _format_layer_for_context(layer: dict[str, Any]) -> str:
@@ -313,14 +499,40 @@ def _format_layer_for_context(layer: dict[str, Any]) -> str:
 
 def _aethermind_session_start(**kwargs: Any) -> None:
     root = _hook_project_root(kwargs)
+    if _is_launch_root(root):
+        return
     aem_store.init_store(root)
 
 
-def _aethermind_pre_llm_call(**kwargs: Any) -> dict[str, str]:
+def _aethermind_pre_llm_call(**kwargs: Any) -> dict[str, str] | None:
     root = _hook_project_root(kwargs)
+    if _is_launch_root(root):
+        return None
     user_message = str(kwargs.get("user_message") or "")
     try:
         aem_store.init_store(root)
+        tree_brief = _tree_brief_if_available(root)
+        if tree_brief is not None:
+            tree_budget = int(os.environ.get("AETHERMIND_TREE_BUDGET", "3600") or "3600")
+            body_section = (
+                "Whole-store tree brief (deterministic from tree.aem; walk deeper with the "
+                "aethermind view and zoom MCP tools):\n" + tree_brief
+            )
+            budget_line = f"Tree brief budget: {tree_budget} chars."
+            context = (
+                "[AetherMind CL2 automatic continuity is active]\n"
+                f"Project root for AetherMind tools: {root}\n"
+                f"{budget_line}\n"
+                "The store was initialized/read before this model call. The tree brief covers "
+                "every record coarsely, must-know corrections in full, and the newest records; "
+                "it is not a substitute for reading complete corrections before using them. "
+                "When the turn produces a load-bearing decision, correction, discovery, friction, "
+                "or uncertainty, write a compact layer and texture pointer. "
+                "Do not write secrets, credentials, raw transcripts, or private prompt text.\n"
+                f"{body_section}\n"
+                "[/AetherMind CL2 automatic continuity]"
+            )
+            return {"context": context}
         budget = int(os.environ.get("AETHERMIND_CL2_AUTO_BUDGET", "900") or "900")
         bundle = cl2.brief(root, budget_tokens=budget, task_hint=user_message, ctx_now=str(root))
         layers = bundle.get("included") or []
@@ -397,7 +609,7 @@ TOOL_SPECS = [
     ),
     (
         "aethermind_read_layers",
-        "Read or search AetherMind continuity layers.",
+        "Search AetherMind layers by text. text matches body, context, and markers. A jarvis: root reads the remote store. Any other root is a local file, and a missing file is an error, not an empty result.",
         _object_schema(
             {
                 **PROJECT_ROOT,
@@ -630,6 +842,8 @@ def _register_skills(ctx) -> None:
 
 
 def _register_hooks(ctx) -> None:
+    # Companion owns companion delivery. It must not disable AetherMind CL2
+    # injection; those are different channels.
     register_hook = getattr(ctx, "register_hook", None)
     if register_hook is None:
         return
@@ -650,4 +864,5 @@ def register(ctx) -> None:
             handler=handler,
         )
     _register_skills(ctx)
+    _ensure_cli_continuity_mcp()
     _register_hooks(ctx)
